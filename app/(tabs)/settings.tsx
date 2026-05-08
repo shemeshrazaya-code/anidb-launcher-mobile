@@ -12,6 +12,8 @@ import {
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { Brand } from '@/constants/theme';
+import { useThemeColor } from '@/hooks/use-theme-color';
 import { addSource, loadSources, removeSource } from '@/src/services/sources';
 import { Source, validateSource } from '@/src/types/source';
 
@@ -20,6 +22,10 @@ const SPONSOR_URL = 'https://github.com/sponsors/shemeshrazaya-code';
 const APP_VERSION = Constants.expoConfig?.version ?? '0.1.x';
 
 export default function SettingsScreen() {
+  const surfaceColor = useThemeColor({}, 'surface');
+  const borderColor = useThemeColor({}, 'border');
+  const textColor = useThemeColor({}, 'text');
+  const mutedColor = useThemeColor({}, 'muted');
   const [sources, setSources] = useState<Source[]>([]);
   const [name, setName] = useState('');
   const [tmpl, setTmpl] = useState('');
@@ -98,25 +104,31 @@ export default function SettingsScreen() {
         <ThemedText type="defaultSemiBold">Add a source</ThemedText>
         <TextInput
           placeholder="Name (e.g. AniList)"
-          placeholderTextColor="#888"
+          placeholderTextColor={mutedColor}
           value={name}
           onChangeText={setName}
-          style={styles.input}
+          style={[
+            styles.input,
+            { backgroundColor: surfaceColor, borderColor, color: textColor },
+          ]}
           autoCapitalize="none"
           autoCorrect={false}
         />
         <TextInput
           placeholder="https://example.com/search?q={query}"
-          placeholderTextColor="#888"
+          placeholderTextColor={mutedColor}
           value={tmpl}
           onChangeText={setTmpl}
-          style={styles.input}
+          style={[
+            styles.input,
+            { backgroundColor: surfaceColor, borderColor, color: textColor },
+          ]}
           autoCapitalize="none"
           autoCorrect={false}
           keyboardType="url"
         />
-        <Pressable onPress={onAdd} style={styles.addBtn}>
-          <ThemedText type="defaultSemiBold">Add</ThemedText>
+        <Pressable onPress={onAdd} style={({ pressed }) => [styles.addBtn, pressed && styles.addBtnPressed]}>
+          <ThemedText type="defaultSemiBold" lightColor="#fff" darkColor="#fff">Add source</ThemedText>
         </Pressable>
       </ThemedView>
 
@@ -168,21 +180,19 @@ const styles = StyleSheet.create({
   deleteText: { color: '#c44', fontWeight: '600', fontSize: 13 },
   input: {
     borderWidth: 1,
-    borderColor: 'rgba(127,127,127,0.3)',
-    borderRadius: 6,
+    borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 14,
-    color: '#000',
-    backgroundColor: '#fff',
   },
   addBtn: {
-    paddingVertical: 10,
+    paddingVertical: 12,
     paddingHorizontal: 16,
-    borderRadius: 6,
-    backgroundColor: 'rgba(80,140,220,0.2)',
+    borderRadius: 10,
+    backgroundColor: Brand.primary,
     alignItems: 'center',
   },
+  addBtnPressed: { opacity: 0.85, backgroundColor: Brand.primaryDark },
   aboutRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -194,5 +204,5 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   aboutLinkPressed: { opacity: 0.55 },
-  aboutLinkText: { fontSize: 14, color: '#5891d8', fontWeight: '500' },
+  aboutLinkText: { fontSize: 14, color: Brand.primaryLight, fontWeight: '500' },
 });

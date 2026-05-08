@@ -1,16 +1,21 @@
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Linking from 'expo-linking';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
+  Animated,
   FlatList,
   Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   TextInput,
+  View,
 } from 'react-native';
+
+import { Brand } from '@/constants/theme';
+import { useThemeColor } from '@/hooks/use-theme-color';
 
 const SPONSOR_URL = 'https://github.com/sponsors/shemeshrazaya-code';
 
@@ -32,6 +37,10 @@ const CATEGORY_LABELS: Record<Category, string> = {
 };
 
 export default function BrowseScreen() {
+  const surfaceColor = useThemeColor({}, 'surface');
+  const borderColor = useThemeColor({}, 'border');
+  const textColor = useThemeColor({}, 'text');
+  const mutedColor = useThemeColor({}, 'muted');
   const [category, setCategory] = useState<Category>('top');
   const [items, setItems] = useState<AnimeDetail[] | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -163,12 +172,7 @@ export default function BrowseScreen() {
   }, [items, searchResults, inSearchMode, activeGenre]);
 
   if (items == null && !error && !inSearchMode) {
-    return (
-      <ThemedView style={styles.center}>
-        <ActivityIndicator size="large" />
-        <ThemedText style={styles.note}>Loading {CATEGORY_LABELS[category]}…</ThemedText>
-      </ThemedView>
-    );
+    return <SkeletonBrowse label={CATEGORY_LABELS[category]} />;
   }
 
   return (
@@ -200,10 +204,13 @@ export default function BrowseScreen() {
       <ThemedView style={styles.searchBar}>
         <TextInput
           placeholder="Search AniList…"
-          placeholderTextColor="#888"
+          placeholderTextColor={mutedColor}
           value={filter}
           onChangeText={setFilter}
-          style={styles.searchInput}
+          style={[
+            styles.searchInput,
+            { backgroundColor: surfaceColor, borderColor, color: textColor },
+          ]}
           autoCapitalize="none"
           autoCorrect={false}
           clearButtonMode="while-editing"
@@ -230,13 +237,24 @@ export default function BrowseScreen() {
           ))}
         </ScrollView>
       )}
+      {progress && !inSearchMode ? (
+        <View style={styles.progressTrack}>
+          <View
+            style={[
+              styles.progressFill,
+              { width: `${Math.min(100, (progress.pageDone / progress.totalPages) * 100)}%` },
+            ]}
+          />
+        </View>
+      ) : (
+        <View style={styles.progressTrackEmpty} />
+      )}
       <ThemedView style={styles.statusRow}>
         {searching ? (
           <ThemedText style={styles.resultCount}>Searching…</ThemedText>
         ) : progress && !inSearchMode ? (
           <ThemedText style={styles.resultCount}>
-            Loading {progress.phase} · page {progress.pageDone}/{progress.totalPages} ·{' '}
-            {progress.itemCount} entries
+            Loading {progress.phase} · {progress.itemCount} entries
           </ThemedText>
         ) : (
           <ThemedText style={styles.resultCount}>
@@ -326,23 +344,75 @@ function AnimeCard({ item }: { item: AnimeDetail }) {
     <Pressable
       onPress={() => router.push({ pathname: '/anime/[aid]', params: { aid: String(item.aid) } })}
       style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}>
-      <ThemedView style={styles.posterWrap}>
+      <View style={styles.posterWrap}>
         {item.pictureUrl ? (
           <Image source={{ uri: item.pictureUrl }} style={styles.cardPoster} contentFit="cover" />
         ) : (
-          <ThemedView style={styles.cardPosterFallback} />
+          <View style={styles.cardPosterFallback} />
         )}
+        <LinearGradient
+          colors={['transparent', 'rgba(0,0,0,0.92)']}
+          locations={[0.45, 1]}
+          style={styles.posterGradient}
+          pointerEvents="none"
+        />
         {item.rating != null && (
-          <ThemedView style={styles.ratingBadge}>
+          <View style={styles.ratingBadge}>
             <ThemedText style={styles.ratingBadgeText}>★ {item.rating.toFixed(1)}</ThemedText>
-          </ThemedView>
+          </View>
         )}
-      </ThemedView>
-      <ThemedText type="defaultSemiBold" numberOfLines={2} style={styles.cardTitle}>
-        {item.title}
-      </ThemedText>
-      {year && <ThemedText style={styles.cardYear}>{year}</ThemedText>}
+        <View style={styles.cardOverlay} pointerEvents="none">
+          <ThemedText
+            type="defaultSemiBold"
+            numberOfLines={2}
+            lightColor="#fff"
+            darkColor="#fff"
+            style={styles.cardTitle}>
+            {item.title}
+          </ThemedText>
+          {year && (
+            <ThemedText lightColor="#fff" darkColor="#fff" style={styles.cardYear}>
+              {year}
+            </ThemedText>
+          )}
+        </View>
+      </View>
     </Pressable>
+  );
+}
+
+function SkeletonBrowse({ label }: { label: string }) {
+  return (
+    <ThemedView style={styles.container}>
+      <View style={styles.progressTrackEmpty} />
+      <ThemedView style={styles.statusRow}>
+        <ThemedText style={styles.resultCount}>Loading {label}…</ThemedText>
+      </ThemedView>
+      <View style={styles.skeletonGrid}>
+        {Array.from({ length: 8 }).map((_, i) => (
+          <SkeletonCard key={i} />
+        ))}
+      </View>
+    </ThemedView>
+  );
+}
+
+function SkeletonCard() {
+  const opacity = useRef(new Animated.Value(0.35)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, { toValue: 0.7, duration: 850, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 0.35, duration: 850, useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [opacity]);
+  return (
+    <Animated.View style={[styles.skeletonCard, { opacity }]}>
+      <View style={styles.skeletonPoster} />
+    </Animated.View>
   );
 }
 
@@ -356,21 +426,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 999,
-    backgroundColor: 'rgba(127,127,127,0.15)',
+    backgroundColor: 'rgba(127,127,127,0.12)',
   },
-  categoryPillActive: { backgroundColor: 'rgba(80,140,220,0.85)' },
+  categoryPillActive: { backgroundColor: Brand.primary },
   categoryPillText: { fontSize: 14, opacity: 0.85, fontWeight: '600' },
   categoryPillTextActive: { color: '#fff', opacity: 1 },
   searchBar: { paddingHorizontal: 12, paddingTop: 8 },
   searchInput: {
     borderWidth: 1,
-    borderColor: 'rgba(127,127,127,0.3)',
-    borderRadius: 8,
+    borderRadius: 10,
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 9,
     fontSize: 14,
-    color: '#000',
-    backgroundColor: '#fff',
   },
   genreScroll: { maxHeight: 44, marginTop: 8 },
   genreScrollContent: { paddingHorizontal: 12, gap: 6, alignItems: 'center' },
@@ -378,41 +445,61 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 999,
-    backgroundColor: 'rgba(127,127,127,0.15)',
+    backgroundColor: 'rgba(127,127,127,0.12)',
   },
-  chipActive: { backgroundColor: 'rgba(80,140,220,0.6)' },
+  chipActive: { backgroundColor: Brand.primarySoftStrong, borderColor: Brand.primary, borderWidth: 1 },
   chipPressed: { opacity: 0.6 },
   chipText: { fontSize: 13, opacity: 0.85 },
-  chipTextActive: { color: '#fff', opacity: 1 },
-  statusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingTop: 8, paddingBottom: 4 },
-  resultCount: { fontSize: 12, opacity: 0.6 },
-  errorBanner: { marginHorizontal: 12, padding: 10, borderRadius: 6, backgroundColor: 'rgba(220,80,80,0.15)' },
-  errorText: { color: '#c44', fontSize: 13 },
+  chipTextActive: { color: Brand.primaryLight, opacity: 1, fontWeight: '600' },
+  progressTrack: {
+    height: 2,
+    marginHorizontal: 12,
+    marginTop: 8,
+    borderRadius: 999,
+    backgroundColor: 'rgba(139,92,246,0.15)',
+    overflow: 'hidden',
+  },
+  progressTrackEmpty: { height: 2, marginHorizontal: 12, marginTop: 8 },
+  progressFill: { height: '100%', backgroundColor: Brand.primary, borderRadius: 999 },
+  statusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingTop: 6, paddingBottom: 6 },
+  resultCount: { fontSize: 12, opacity: 0.55 },
+  errorBanner: { marginHorizontal: 12, padding: 10, borderRadius: 8, backgroundColor: 'rgba(220,80,80,0.15)' },
+  errorText: { color: '#e57373', fontSize: 13 },
   listContent: { paddingHorizontal: 8, paddingBottom: 16 },
   gridRow: { gap: 8, paddingHorizontal: 4 },
-  card: { flex: 1, marginBottom: 12, gap: 4 },
-  cardPressed: { opacity: 0.7 },
-  posterWrap: { position: 'relative' },
-  cardPoster: { width: '100%', aspectRatio: 2 / 3, borderRadius: 8, backgroundColor: '#222' },
-  cardPosterFallback: { width: '100%', aspectRatio: 2 / 3, borderRadius: 8, backgroundColor: '#333' },
+  card: { flex: 1, marginBottom: 12 },
+  cardPressed: { opacity: 0.75, transform: [{ scale: 0.98 }] },
+  posterWrap: { position: 'relative', borderRadius: 10, overflow: 'hidden' },
+  cardPoster: { width: '100%', aspectRatio: 2 / 3, backgroundColor: '#1a1a1c' },
+  cardPosterFallback: { width: '100%', aspectRatio: 2 / 3, backgroundColor: '#1a1a1c' },
+  posterGradient: { position: 'absolute', left: 0, right: 0, bottom: 0, top: 0 },
   ratingBadge: {
     position: 'absolute',
-    bottom: 6,
-    left: 6,
+    top: 6,
+    right: 6,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
-    backgroundColor: 'rgba(0,0,0,0.65)',
+    backgroundColor: 'rgba(0,0,0,0.7)',
   },
   ratingBadgeText: { color: '#fff', fontSize: 11, fontWeight: '600' },
-  cardTitle: { fontSize: 13, lineHeight: 17 },
-  cardYear: { fontSize: 11, opacity: 0.6 },
+  cardOverlay: { position: 'absolute', left: 8, right: 8, bottom: 8 },
+  cardTitle: { fontSize: 13, lineHeight: 16, textShadowColor: 'rgba(0,0,0,0.6)', textShadowRadius: 4 },
+  cardYear: { fontSize: 11, opacity: 0.85, marginTop: 2 },
   empty: { padding: 32, alignItems: 'center', flex: 1 },
   sponsorFooter: {
-    paddingVertical: 16,
+    paddingVertical: 18,
     paddingHorizontal: 12,
     alignItems: 'center',
   },
   sponsorFooterPressed: { opacity: 0.5 },
-  sponsorFooterText: { fontSize: 12, opacity: 0.5 },
+  sponsorFooterText: { fontSize: 12, opacity: 0.45 },
+  skeletonGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 8 },
+  skeletonCard: { width: '50%', padding: 4 },
+  skeletonPoster: {
+    width: '100%',
+    aspectRatio: 2 / 3,
+    borderRadius: 10,
+    backgroundColor: 'rgba(127,127,127,0.18)',
+  },
 });

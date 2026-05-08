@@ -7,6 +7,14 @@
 - **Optional sponsor footer** at the bottom of Browse — small low-opacity link, only shown when there are results.
 - `.github/FUNDING.yml` — surfaces the Sponsor button on the GitHub repo page.
 
+### Changed
+- **Visual refresh.** New violet brand color (`#8b5cf6`) replaces the generic blue accent across category pills, genre chips, the Add Source button, and the Favorited state.
+- **Browse cards** now render the title and year directly on the poster with a bottom-fade gradient, so titles stay readable on bright artwork. Rating badge moved to top-right. Press state adds a subtle scale-down.
+- **Skeleton loader.** Initial Browse load shows a pulsing 8-card grid skeleton instead of a centered spinner.
+- **Progress bar.** Streaming category fetches now show a thin violet progress bar at the top, replacing the verbose "Loading top · page 17/60 · 850 entries" line. Status text now just shows phase and entry count.
+- **Theme-aware text inputs.** Search bar (Browse) and the Add Source inputs (Settings) now respect light/dark mode instead of hardcoding white-on-white.
+- **Theme palette extended** with `surface`, `border`, and `muted` color tokens for consistent input styling. Dark background deepened from `#151718` to `#0e0f10`.
+
 ### Fixed
 - Browse error-retry banner crashed when tapped (referenced a `load` function that was renamed to `onRefresh` in v0.1.2's streaming refactor). Now wired to `onRefresh`.
 

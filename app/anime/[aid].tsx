@@ -5,6 +5,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { Brand } from '@/constants/theme';
 import { getCachedAnyCategory } from '@/src/services/anilist';
 import { toggleFavorite, loadFavorites } from '@/src/services/favorites';
 import { launch } from '@/src/services/launcher';
@@ -79,8 +80,17 @@ export default function AnimeDetailScreen() {
           {anime.rating != null && (
             <ThemedText style={styles.rating}>★ {anime.rating.toFixed(1)}</ThemedText>
           )}
-          <Pressable onPress={onToggleFavorite} style={styles.favBtn}>
-            <ThemedText type="defaultSemiBold">
+          <Pressable
+            onPress={onToggleFavorite}
+            style={({ pressed }) => [
+              styles.favBtn,
+              isFavorite && styles.favBtnActive,
+              pressed && styles.favBtnPressed,
+            ]}>
+            <ThemedText
+              type="defaultSemiBold"
+              lightColor={isFavorite ? '#fff' : undefined}
+              darkColor={isFavorite ? '#fff' : undefined}>
               {isFavorite ? '★ Favorited' : '☆ Add to favorites'}
             </ThemedText>
           </Pressable>
@@ -146,7 +156,9 @@ const styles = StyleSheet.create({
   headerText: { flex: 1, gap: 6 },
   meta: { opacity: 0.7, fontSize: 14 },
   rating: { fontSize: 16, opacity: 0.9 },
-  favBtn: { marginTop: 8, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 6, backgroundColor: 'rgba(127,127,127,0.15)', alignSelf: 'flex-start' },
+  favBtn: { marginTop: 8, paddingVertical: 8, paddingHorizontal: 14, borderRadius: 999, backgroundColor: 'rgba(127,127,127,0.15)', alignSelf: 'flex-start' },
+  favBtnActive: { backgroundColor: Brand.primary },
+  favBtnPressed: { opacity: 0.85 },
   genreRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   genrePill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: 'rgba(127,127,127,0.18)' },
   genreText: { fontSize: 12, opacity: 0.85 },
