@@ -246,7 +246,7 @@ export default function BrowseScreen() {
         )}
       </ThemedView>
       {error && !inSearchMode ? (
-        <Pressable onPress={() => load(category, true)} style={styles.errorBanner}>
+        <Pressable onPress={onRefresh} style={styles.errorBanner}>
           <ThemedText style={styles.errorText}>{error} — tap to retry</ThemedText>
         </Pressable>
       ) : null}
