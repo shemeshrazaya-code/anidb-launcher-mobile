@@ -61,6 +61,10 @@ v0.1.0 ships the core launcher loop. Planned for later:
 - iOS build (TestFlight or Appetize)
 - Source-availability check (probe a URL pattern before launching)
 
+## Support
+
+If this app earned its place on your home screen, you can [sponsor on GitHub](https://github.com/sponsors/shemeshrazaya-code). Entirely optional — the app is free, FOSS, and stays that way regardless.
+
 ## License
 
 MIT

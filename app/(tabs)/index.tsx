@@ -1,4 +1,5 @@
 import { Image } from 'expo-image';
+import * as Linking from 'expo-linking';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -10,6 +11,8 @@ import {
   StyleSheet,
   TextInput,
 } from 'react-native';
+
+const SPONSOR_URL = 'https://github.com/sponsors/shemeshrazaya-code';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -266,6 +269,17 @@ export default function BrowseScreen() {
             </ThemedView>
           )
         }
+        ListFooterComponent={
+          visible.length > 0 ? (
+            <Pressable
+              onPress={() => Linking.openURL(SPONSOR_URL)}
+              style={({ pressed }) => [styles.sponsorFooter, pressed && styles.sponsorFooterPressed]}>
+              <ThemedText style={styles.sponsorFooterText}>
+                Like this? Sponsor on GitHub ♥
+              </ThemedText>
+            </Pressable>
+          ) : null
+        }
         keyboardShouldPersistTaps="handled"
       />
     </ThemedView>
@@ -394,4 +408,11 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 13, lineHeight: 17 },
   cardYear: { fontSize: 11, opacity: 0.6 },
   empty: { padding: 32, alignItems: 'center', flex: 1 },
+  sponsorFooter: {
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+  },
+  sponsorFooterPressed: { opacity: 0.5 },
+  sponsorFooterText: { fontSize: 12, opacity: 0.5 },
 });

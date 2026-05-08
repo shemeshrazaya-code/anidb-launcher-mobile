@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### New
+- **About section** in Settings: app version, GitHub repo link, Sponsor link.
+- **Optional sponsor footer** at the bottom of Browse — small low-opacity link, only shown when there are results.
+- `.github/FUNDING.yml` — surfaces the Sponsor button on the GitHub repo page.
+
+### Fixed
+- Browse error-retry banner crashed when tapped (referenced a `load` function that was renamed to `onRefresh` in v0.1.2's streaming refactor). Now wired to `onRefresh`.
+
 ## v0.1.2 — 2026-05-08
 
 Match the desktop's catalogue depth — ~7,500 anime instead of ~1,200.

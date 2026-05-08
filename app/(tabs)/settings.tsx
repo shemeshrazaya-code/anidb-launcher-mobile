@@ -1,3 +1,5 @@
+import Constants from 'expo-constants';
+import * as Linking from 'expo-linking';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
@@ -12,6 +14,10 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { addSource, loadSources, removeSource } from '@/src/services/sources';
 import { Source, validateSource } from '@/src/types/source';
+
+const REPO_URL = 'https://github.com/shemeshrazaya-code/anidb-launcher-mobile';
+const SPONSOR_URL = 'https://github.com/sponsors/shemeshrazaya-code';
+const APP_VERSION = Constants.expoConfig?.version ?? '0.1.x';
 
 export default function SettingsScreen() {
   const [sources, setSources] = useState<Source[]>([]);
@@ -113,6 +119,27 @@ export default function SettingsScreen() {
           <ThemedText type="defaultSemiBold">Add</ThemedText>
         </Pressable>
       </ThemedView>
+
+      <ThemedView style={styles.section}>
+        <ThemedText type="subtitle">About</ThemedText>
+        <ThemedView style={styles.aboutRow}>
+          <ThemedText style={styles.aboutLabel}>Version</ThemedText>
+          <ThemedText style={styles.aboutValue}>{APP_VERSION}</ThemedText>
+        </ThemedView>
+        <Pressable
+          onPress={() => Linking.openURL(REPO_URL)}
+          style={({ pressed }) => [styles.aboutLink, pressed && styles.aboutLinkPressed]}>
+          <ThemedText style={styles.aboutLinkText}>GitHub repo →</ThemedText>
+        </Pressable>
+        <Pressable
+          onPress={() => Linking.openURL(SPONSOR_URL)}
+          style={({ pressed }) => [styles.aboutLink, pressed && styles.aboutLinkPressed]}>
+          <ThemedText style={styles.aboutLinkText}>Sponsor on GitHub ♥</ThemedText>
+        </Pressable>
+        <ThemedText style={styles.help}>
+          Free, FOSS, no ads. Sponsorships are optional and appreciated.
+        </ThemedText>
+      </ThemedView>
     </ScrollView>
   );
 }
@@ -156,4 +183,16 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(80,140,220,0.2)',
     alignItems: 'center',
   },
+  aboutRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
+  },
+  aboutLabel: { opacity: 0.7, fontSize: 13 },
+  aboutValue: { fontSize: 13, fontWeight: '600' },
+  aboutLink: {
+    paddingVertical: 8,
+  },
+  aboutLinkPressed: { opacity: 0.55 },
+  aboutLinkText: { fontSize: 14, color: '#5891d8', fontWeight: '500' },
 });
