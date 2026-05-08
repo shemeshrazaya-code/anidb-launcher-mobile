@@ -1,50 +1,66 @@
-# Welcome to your Expo app 👋
+# anidb-launcher-mobile
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Android port of [anidb-launcher](https://github.com/shemeshrazaya-code/anidb-launcher) — browse top anime, then launch a search on any user-configured site in your default browser.
 
-## Get started
+Built with Expo SDK 54 + React Native 0.81 + TypeScript.
 
-1. Install dependencies
+## What it does
 
-   ```bash
-   npm install
-   ```
+- **Browse** — top anime from AniList, posters and metadata, pull-to-refresh.
+- **Detail** — synopsis, genres, alt titles, "Search on…" action.
+- **Favorites** — tap "Add to favorites" on any anime, view the list anytime.
+- **Settings** — bring your own search URLs. Configure as many sources as you want.
 
-2. Start the app
+The app's core action: pick an anime, pick a source, and the app fires off `https://your-source.example/search?q={title}` in your browser. Sources are user-supplied — the app ships with zero defaults by design.
 
-   ```bash
-   npx expo start
-   ```
+## Install (sideload)
 
-In the output, you'll find options to open the app in a
+Grab the APK from the [latest release](https://github.com/shemeshrazaya-code/anidb-launcher-mobile/releases/latest), allow installs from unknown sources, install. Android 7.0+ (API 24+).
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## First-run setup
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+1. Open the **Settings** tab.
+2. Add a source: a name (e.g. `MyAnimeList`) and a URL template containing `{query}` where the title goes (e.g. `https://myanimelist.net/anime.php?q={query}`).
+3. Open any anime from Browse — your sources appear under "Search on…".
 
-## Get a fresh project
-
-When you're ready, run:
+## Build from source
 
 ```bash
-npm run reset-project
+git clone https://github.com/shemeshrazaya-code/anidb-launcher-mobile
+cd anidb-launcher-mobile
+npm install
+npx expo prebuild --platform android
+cd android
+./gradlew assembleRelease
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+The APK lands at `android/app/build/outputs/apk/release/app-release.apk`.
 
-## Learn more
+For the dev loop on Windows + Android emulator, prefer `--localhost`:
 
-To learn more about developing your project with Expo, look at the following resources:
+```bash
+npx expo start --localhost --android
+```
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+(Without `--localhost`, the emulator can stall fetching the bundle from Metro's LAN IP.)
 
-## Join the community
+## Run tests
 
-Join our community of developers creating universal apps.
+```bash
+npm test
+```
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Storage layer (sources, favorites, URL templating) is covered by jest. UI is verified manually on `Pixel_7_API_34`.
+
+## Roadmap
+
+v0.1.0 ships the core launcher loop. Planned for later:
+
+- Reminders ("watch later" with optional notification)
+- First-run setup wizard for sources
+- iOS build (TestFlight or Appetize)
+- Source-availability check (probe a URL pattern before launching)
+
+## License
+
+MIT

@@ -2,7 +2,7 @@
   "expo": {
     "name": "anidb-launcher-mobile",
     "slug": "anidb-launcher-mobile",
-    "version": "1.0.0",
+    "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "anidblaunchermobile",
@@ -19,7 +19,8 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.anonymous.anidblaunchermobile"
     },
     "web": {
       "output": "static",
