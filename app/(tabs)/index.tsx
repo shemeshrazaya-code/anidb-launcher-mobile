@@ -7,12 +7,12 @@ import {
   Animated,
   FlatList,
   Pressable,
-  RefreshControl,
   ScrollView,
   StyleSheet,
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Brand } from '@/constants/theme';
 import { useThemeColor } from '@/hooks/use-theme-color';
@@ -37,6 +37,7 @@ const CATEGORY_LABELS: Record<Category, string> = {
 };
 
 export default function BrowseScreen() {
+  const insets = useSafeAreaInsets();
   const surfaceColor = useThemeColor({}, 'surface');
   const borderColor = useThemeColor({}, 'border');
   const textColor = useThemeColor({}, 'text');
@@ -176,7 +177,10 @@ export default function BrowseScreen() {
   }
 
   return (
-    <ThemedView style={styles.container}>
+    <ThemedView style={[styles.container, { paddingTop: insets.top }]}>
+      <View style={styles.appHeader}>
+        <ThemedText style={styles.appTitle}>Anime DB</ThemedText>
+      </View>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -215,6 +219,23 @@ export default function BrowseScreen() {
           autoCorrect={false}
           clearButtonMode="while-editing"
         />
+        <Pressable
+          onPress={onRefresh}
+          disabled={refreshing || (progress != null)}
+          style={({ pressed }) => [
+            styles.refreshBtn,
+            { backgroundColor: surfaceColor, borderColor },
+            pressed && styles.refreshBtnPressed,
+            (refreshing || progress != null) && styles.refreshBtnDisabled,
+          ]}>
+          <ThemedText
+            style={[
+              styles.refreshBtnText,
+              (refreshing || progress != null) && styles.refreshBtnTextActive,
+            ]}>
+            ↻
+          </ThemedText>
+        </Pressable>
       </ThemedView>
       {!inSearchMode && genres.length > 0 && (
         <ScrollView
@@ -274,11 +295,6 @@ export default function BrowseScreen() {
         contentContainerStyle={styles.listContent}
         columnWrapperStyle={styles.gridRow}
         numColumns={2}
-        refreshControl={
-          inSearchMode ? undefined : (
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-          )
-        }
         renderItem={({ item }) => <AnimeCard item={item} />}
         ListEmptyComponent={
           searching ? null : (
@@ -420,37 +436,60 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 },
   note: { opacity: 0.7 },
-  categoryRow: { maxHeight: 48, marginTop: 8 },
-  categoryRowContent: { paddingHorizontal: 12, gap: 8, alignItems: 'center' },
-  categoryPill: {
+  appHeader: {
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingTop: 12,
+    paddingBottom: 4,
+  },
+  appTitle: {
+    fontSize: 26,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  categoryRow: { marginTop: 4, flexGrow: 0, flexShrink: 0 },
+  categoryRowContent: { paddingHorizontal: 12, paddingVertical: 8, gap: 8, alignItems: 'center', minHeight: 56 },
+  categoryPill: {
+    paddingHorizontal: 18,
+    paddingVertical: 9,
     borderRadius: 999,
     backgroundColor: 'rgba(127,127,127,0.12)',
   },
   categoryPillActive: { backgroundColor: Brand.primary },
   categoryPillText: { fontSize: 14, opacity: 0.85, fontWeight: '600' },
   categoryPillTextActive: { color: '#fff', opacity: 1 },
-  searchBar: { paddingHorizontal: 12, paddingTop: 8 },
+  searchBar: { paddingHorizontal: 12, paddingTop: 8, flexDirection: 'row', gap: 8, alignItems: 'center' },
   searchInput: {
+    flex: 1,
     borderWidth: 1,
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 9,
     fontSize: 14,
   },
-  genreScroll: { maxHeight: 44, marginTop: 8 },
-  genreScrollContent: { paddingHorizontal: 12, gap: 6, alignItems: 'center' },
+  refreshBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  refreshBtnPressed: { opacity: 0.6 },
+  refreshBtnDisabled: { opacity: 0.4 },
+  refreshBtnText: { fontSize: 18, fontWeight: '600' },
+  refreshBtnTextActive: { color: Brand.primaryLight },
+  genreScroll: { marginTop: 8, flexGrow: 0, flexShrink: 0 },
+  genreScrollContent: { paddingHorizontal: 12, paddingVertical: 4, gap: 6, alignItems: 'center', minHeight: 36 },
   chip: {
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 999,
     backgroundColor: 'rgba(127,127,127,0.12)',
   },
-  chipActive: { backgroundColor: Brand.primarySoftStrong, borderColor: Brand.primary, borderWidth: 1 },
+  chipActive: { backgroundColor: Brand.primary },
   chipPressed: { opacity: 0.6 },
   chipText: { fontSize: 13, opacity: 0.85 },
-  chipTextActive: { color: Brand.primaryLight, opacity: 1, fontWeight: '600' },
+  chipTextActive: { color: '#fff', opacity: 1, fontWeight: '600' },
   progressTrack: {
     height: 2,
     marginHorizontal: 12,

@@ -1,7 +1,8 @@
 import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { FlatList, Pressable, StyleSheet } from 'react-native';
+import { FlatList, Pressable, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -10,6 +11,7 @@ import { loadFavorites } from '@/src/services/favorites';
 import { AnimeDetail } from '@/src/types/anime';
 
 export default function FavoritesScreen() {
+  const insets = useSafeAreaInsets();
   const [items, setItems] = useState<AnimeDetail[]>([]);
   const [loaded, setLoaded] = useState(false);
 
@@ -45,33 +47,32 @@ export default function FavoritesScreen() {
     }, []),
   );
 
-  if (!loaded) {
-    return (
-      <ThemedView style={styles.center}>
-        <ThemedText style={styles.note}>Loading favorites…</ThemedText>
-      </ThemedView>
-    );
-  }
-
-  if (items.length === 0) {
-    return (
-      <ThemedView style={styles.center}>
-        <ThemedText type="subtitle">No favorites yet</ThemedText>
-        <ThemedText style={styles.note}>
-          Open an anime from Browse and tap “Add to favorites”.
-        </ThemedText>
-      </ThemedView>
-    );
-  }
-
   return (
-    <FlatList
-      data={items}
-      keyExtractor={(item) => String(item.aid)}
-      contentContainerStyle={styles.listContent}
-      renderItem={({ item }) => <FavoriteRow item={item} />}
-      ItemSeparatorComponent={() => <ThemedView style={styles.separator} />}
-    />
+    <ThemedView style={[styles.screen, { paddingTop: insets.top }]}>
+      <View style={styles.appHeader}>
+        <ThemedText style={styles.appTitle}>Favorites</ThemedText>
+      </View>
+      {!loaded ? (
+        <ThemedView style={styles.center}>
+          <ThemedText style={styles.note}>Loading favorites…</ThemedText>
+        </ThemedView>
+      ) : items.length === 0 ? (
+        <ThemedView style={styles.center}>
+          <ThemedText type="subtitle">No favorites yet</ThemedText>
+          <ThemedText style={styles.note}>
+            Open an anime from Browse and tap “Add to favorites”.
+          </ThemedText>
+        </ThemedView>
+      ) : (
+        <FlatList
+          data={items}
+          keyExtractor={(item) => String(item.aid)}
+          contentContainerStyle={styles.listContent}
+          renderItem={({ item }) => <FavoriteRow item={item} />}
+          ItemSeparatorComponent={() => <ThemedView style={styles.separator} />}
+        />
+      )}
+    </ThemedView>
   );
 }
 
@@ -96,6 +97,9 @@ function FavoriteRow({ item }: { item: AnimeDetail }) {
 }
 
 const styles = StyleSheet.create({
+  screen: { flex: 1 },
+  appHeader: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
+  appTitle: { fontSize: 26, fontWeight: '800', letterSpacing: 0.5 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 },
   note: { opacity: 0.7, textAlign: 'center' },
   listContent: { paddingVertical: 8 },

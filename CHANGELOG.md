@@ -3,6 +3,11 @@
 ## Unreleased
 
 ### New
+- **Branded app identity.** New custom app icon (DB Anime mark) + splash screen (anime character launcher art, dark base) wired through `app.json`. Replaces the default Expo icon and white splash.
+- **Snake-skin background.** Subtle SVG hexagonal-scale pattern with violet undertones tiled across all screens, behind all content. New `components/snake-skin-bg.tsx`. Added `react-native-svg` for the inline pattern.
+- **Forced dark theme.** `userInterfaceStyle: "dark"` in `app.json` — no more white-on-white in any system setting. Custom transparent-background dark theme on `@react-navigation/native`'s `ThemeProvider` so the snake-skin shows through every navigator scene.
+- **Custom in-screen headers.** Each tab now has its own large title (`Anime DB` / `Favorites` / `Settings`) inside the screen, with proper safe-area top inset. Default Expo Router tab header is hidden, reclaiming the dead vertical space.
+- **Manual refresh button.** Replaces pull-to-refresh on Browse with a small `↻` button next to the search bar — pull-to-refresh was too easy to fire accidentally and re-download ~7,500 entries (~3 min on AniList rate limit). Button is disabled while a fetch is in flight.
 - **About section** in Settings: app version, GitHub repo link, Sponsor link.
 - **Optional sponsor footer** at the bottom of Browse — small low-opacity link, only shown when there are results.
 - `.github/FUNDING.yml` — surfaces the Sponsor button on the GitHub repo page.

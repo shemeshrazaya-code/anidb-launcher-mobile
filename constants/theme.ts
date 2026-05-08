@@ -30,8 +30,8 @@ export const Colors = {
   },
   dark: {
     text: '#ECEDEE',
-    background: '#0e0f10',
-    surface: '#1c1d1f',
+    background: 'transparent',
+    surface: 'rgba(28, 29, 31, 0.78)',
     border: 'rgba(255,255,255,0.10)',
     tint: tintColorDark,
     muted: '#9BA1A6',

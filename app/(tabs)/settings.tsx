@@ -8,7 +8,9 @@ import {
   ScrollView,
   StyleSheet,
   TextInput,
+  View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -22,6 +24,7 @@ const SPONSOR_URL = 'https://github.com/sponsors/shemeshrazaya-code';
 const APP_VERSION = Constants.expoConfig?.version ?? '0.1.x';
 
 export default function SettingsScreen() {
+  const insets = useSafeAreaInsets();
   const surfaceColor = useThemeColor({}, 'surface');
   const borderColor = useThemeColor({}, 'border');
   const textColor = useThemeColor({}, 'text');
@@ -72,7 +75,10 @@ export default function SettingsScreen() {
   );
 
   return (
-    <ScrollView contentContainerStyle={styles.scroll}>
+    <ScrollView contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 12 }]}>
+      <View style={styles.appHeader}>
+        <ThemedText style={styles.appTitle}>Settings</ThemedText>
+      </View>
       <ThemedView style={styles.section}>
         <ThemedText type="subtitle">Search sources</ThemedText>
         <ThemedText style={styles.help}>
@@ -158,6 +164,8 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   scroll: { padding: 16, gap: 16 },
+  appHeader: { paddingBottom: 4 },
+  appTitle: { fontSize: 26, fontWeight: '800', letterSpacing: 0.5 },
   section: { gap: 8 },
   help: { opacity: 0.7, fontSize: 13 },
   empty: { opacity: 0.6, fontStyle: 'italic' },
