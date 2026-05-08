@@ -5,7 +5,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { getCachedTopAnime } from '@/src/services/anilist';
+import { getCachedAnyCategory } from '@/src/services/anilist';
 import { toggleFavorite, loadFavorites } from '@/src/services/favorites';
 import { launch } from '@/src/services/launcher';
 import { loadSources } from '@/src/services/sources';
@@ -21,12 +21,11 @@ export default function AnimeDetailScreen() {
 
   useEffect(() => {
     (async () => {
-      const [cached, srcs, favs] = await Promise.all([
-        getCachedTopAnime(),
+      const [found, srcs, favs] = await Promise.all([
+        getCachedAnyCategory(aid),
         loadSources(),
         loadFavorites(),
       ]);
-      const found = cached?.find((a) => a.aid === aid) ?? null;
       setAnime(found);
       setSources(srcs);
       setIsFavorite(favs.has(aid));

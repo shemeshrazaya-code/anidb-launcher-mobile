@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -13,39 +13,134 @@ import {
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { getTopAnime } from '@/src/services/anilist';
+import {
+  Category,
+  FetchProgress,
+  getCachedCategory,
+  getCategory,
+  searchAnime,
+} from '@/src/services/anilist';
 import { AnimeDetail } from '@/src/types/anime';
 
+const CATEGORY_LABELS: Record<Category, string> = {
+  top: 'Top',
+  trending: 'Trending',
+  hentai: 'Hentai',
+};
+
 export default function BrowseScreen() {
+  const [category, setCategory] = useState<Category>('top');
   const [items, setItems] = useState<AnimeDetail[] | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
   const [activeGenre, setActiveGenre] = useState<string | null>(null);
-
-  const load = useCallback(async (force: boolean) => {
-    setError(null);
-    try {
-      const data = await getTopAnime({ forceRefresh: force });
-      setItems(data);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setError(msg);
-    }
-  }, []);
+  const [searchResults, setSearchResults] = useState<AnimeDetail[] | null>(null);
+  const [searching, setSearching] = useState(false);
+  const searchSeq = useRef(0);
+  const [progress, setProgress] = useState<FetchProgress | null>(null);
+  const fetchSignal = useRef<{ cancelled: boolean } | null>(null);
 
   useEffect(() => {
-    load(false);
-  }, [load]);
+    setActiveGenre(null);
+    setItems(null);
+    setError(null);
+    setProgress(null);
+    if (fetchSignal.current) fetchSignal.current.cancelled = true;
+    const signal = { cancelled: false };
+    fetchSignal.current = signal;
+
+    (async () => {
+      const cached = await getCachedCategory(category);
+      if (signal.cancelled) return;
+      if (cached && cached.length > 0) setItems(cached);
+
+      try {
+        const fresh = await getCategory(category, {
+          onProgress: (p) => {
+            if (signal.cancelled) return;
+            setProgress(p);
+            setItems(p.items);
+          },
+          signal,
+        });
+        if (signal.cancelled) return;
+        setItems(fresh);
+        setProgress(null);
+      } catch (e: unknown) {
+        if (signal.cancelled) return;
+        const msg = e instanceof Error ? e.message : String(e);
+        setError(msg);
+        setProgress(null);
+      }
+    })();
+
+    return () => {
+      signal.cancelled = true;
+    };
+  }, [category]);
+
+  useEffect(() => {
+    const q = filter.trim();
+    if (!q) {
+      setSearchResults(null);
+      setSearching(false);
+      return;
+    }
+    const seq = ++searchSeq.current;
+    setSearching(true);
+    const timer = setTimeout(async () => {
+      try {
+        const results = await searchAnime(q, { includeAdult: category === 'hentai' });
+        if (seq === searchSeq.current) {
+          setSearchResults(results);
+          setSearching(false);
+        }
+      } catch (e) {
+        if (seq === searchSeq.current) {
+          setSearchResults([]);
+          setSearching(false);
+        }
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [filter, category]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await load(true);
-    setRefreshing(false);
-  }, [load]);
+    setError(null);
+    if (fetchSignal.current) fetchSignal.current.cancelled = true;
+    const signal = { cancelled: false };
+    fetchSignal.current = signal;
+    try {
+      const fresh = await getCategory(category, {
+        forceRefresh: true,
+        onProgress: (p) => {
+          if (signal.cancelled) return;
+          setProgress(p);
+          setItems(p.items);
+        },
+        signal,
+      });
+      if (!signal.cancelled) {
+        setItems(fresh);
+        setProgress(null);
+      }
+    } catch (e) {
+      if (!signal.cancelled) {
+        const msg = e instanceof Error ? e.message : String(e);
+        setError(msg);
+        setProgress(null);
+      }
+    } finally {
+      setRefreshing(false);
+    }
+  }, [category]);
+
+  const inSearchMode = filter.trim().length > 0;
 
   const genres = useMemo(() => {
-    if (!items) return [];
+    if (!items || inSearchMode) return [];
     const counts = new Map<string, number>();
     for (const a of items) {
       for (const g of a.genres ?? []) counts.set(g, (counts.get(g) ?? 0) + 1);
@@ -54,45 +149,54 @@ export default function BrowseScreen() {
       .sort((a, b) => b[1] - a[1])
       .slice(0, 20)
       .map(([name]) => name);
-  }, [items]);
+  }, [items, inSearchMode]);
 
-  const filtered = useMemo(() => {
+  const visible = useMemo(() => {
+    if (inSearchMode) return searchResults ?? [];
     if (!items) return [];
-    const q = filter.trim().toLowerCase();
-    return items.filter((a) => {
-      if (activeGenre && !(a.genres ?? []).includes(activeGenre)) return false;
-      if (!q) return true;
-      if (a.title.toLowerCase().includes(q)) return true;
-      return (a.altTitles ?? []).some((t) => t.toLowerCase().includes(q));
-    });
-  }, [items, filter, activeGenre]);
+    return activeGenre
+      ? items.filter((a) => (a.genres ?? []).includes(activeGenre))
+      : items;
+  }, [items, searchResults, inSearchMode, activeGenre]);
 
-  if (items == null && !error) {
+  if (items == null && !error && !inSearchMode) {
     return (
       <ThemedView style={styles.center}>
         <ActivityIndicator size="large" />
-        <ThemedText style={styles.note}>Fetching top anime from AniList…</ThemedText>
-      </ThemedView>
-    );
-  }
-
-  if (error && (items == null || items.length === 0)) {
-    return (
-      <ThemedView style={styles.center}>
-        <ThemedText type="subtitle">Could not load anime</ThemedText>
-        <ThemedText style={styles.errorMsg}>{error}</ThemedText>
-        <Pressable onPress={() => load(true)} style={styles.retry}>
-          <ThemedText type="defaultSemiBold">Retry</ThemedText>
-        </Pressable>
+        <ThemedText style={styles.note}>Loading {CATEGORY_LABELS[category]}…</ThemedText>
       </ThemedView>
     );
   }
 
   return (
     <ThemedView style={styles.container}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.categoryRow}
+        contentContainerStyle={styles.categoryRowContent}>
+        {(Object.keys(CATEGORY_LABELS) as Category[]).map((c) => (
+          <Pressable
+            key={c}
+            onPress={() => setCategory(c)}
+            style={({ pressed }) => [
+              styles.categoryPill,
+              category === c && styles.categoryPillActive,
+              pressed && styles.chipPressed,
+            ]}>
+            <ThemedText
+              style={[
+                styles.categoryPillText,
+                category === c && styles.categoryPillTextActive,
+              ]}>
+              {CATEGORY_LABELS[c]}
+            </ThemedText>
+          </Pressable>
+        ))}
+      </ScrollView>
       <ThemedView style={styles.searchBar}>
         <TextInput
-          placeholder="Filter by title…"
+          placeholder="Search AniList…"
           placeholderTextColor="#888"
           value={filter}
           onChangeText={setFilter}
@@ -102,7 +206,7 @@ export default function BrowseScreen() {
           clearButtonMode="while-editing"
         />
       </ThemedView>
-      {genres.length > 0 && (
+      {!inSearchMode && genres.length > 0 && (
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -123,22 +227,44 @@ export default function BrowseScreen() {
           ))}
         </ScrollView>
       )}
-      <ThemedText style={styles.resultCount}>
-        {filtered.length} {filtered.length === 1 ? 'result' : 'results'}
-        {activeGenre ? ` · ${activeGenre}` : ''}
-      </ThemedText>
+      <ThemedView style={styles.statusRow}>
+        {searching ? (
+          <ThemedText style={styles.resultCount}>Searching…</ThemedText>
+        ) : progress && !inSearchMode ? (
+          <ThemedText style={styles.resultCount}>
+            Loading {progress.phase} · page {progress.pageDone}/{progress.totalPages} ·{' '}
+            {progress.itemCount} entries
+          </ThemedText>
+        ) : (
+          <ThemedText style={styles.resultCount}>
+            {visible.length} {visible.length === 1 ? 'result' : 'results'}
+            {inSearchMode ? ` for "${filter.trim()}"` : activeGenre ? ` · ${activeGenre}` : ''}
+          </ThemedText>
+        )}
+      </ThemedView>
+      {error && !inSearchMode ? (
+        <Pressable onPress={() => load(category, true)} style={styles.errorBanner}>
+          <ThemedText style={styles.errorText}>{error} — tap to retry</ThemedText>
+        </Pressable>
+      ) : null}
       <FlatList
-        data={filtered}
+        data={visible}
         keyExtractor={(item) => String(item.aid)}
         contentContainerStyle={styles.listContent}
         columnWrapperStyle={styles.gridRow}
         numColumns={2}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        refreshControl={
+          inSearchMode ? undefined : (
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          )
+        }
         renderItem={({ item }) => <AnimeCard item={item} />}
         ListEmptyComponent={
-          <ThemedView style={styles.empty}>
-            <ThemedText style={styles.note}>No matches.</ThemedText>
-          </ThemedView>
+          searching ? null : (
+            <ThemedView style={styles.empty}>
+              <ThemedText style={styles.note}>No matches.</ThemedText>
+            </ThemedView>
+          )
         }
         keyboardShouldPersistTaps="handled"
       />
@@ -210,8 +336,17 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 },
   note: { opacity: 0.7 },
-  errorMsg: { textAlign: 'center', opacity: 0.7 },
-  retry: { marginTop: 8, paddingVertical: 8, paddingHorizontal: 16 },
+  categoryRow: { maxHeight: 48, marginTop: 8 },
+  categoryRowContent: { paddingHorizontal: 12, gap: 8, alignItems: 'center' },
+  categoryPill: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: 'rgba(127,127,127,0.15)',
+  },
+  categoryPillActive: { backgroundColor: 'rgba(80,140,220,0.85)' },
+  categoryPillText: { fontSize: 14, opacity: 0.85, fontWeight: '600' },
+  categoryPillTextActive: { color: '#fff', opacity: 1 },
   searchBar: { paddingHorizontal: 12, paddingTop: 8 },
   searchInput: {
     borderWidth: 1,
@@ -235,7 +370,10 @@ const styles = StyleSheet.create({
   chipPressed: { opacity: 0.6 },
   chipText: { fontSize: 13, opacity: 0.85 },
   chipTextActive: { color: '#fff', opacity: 1 },
-  resultCount: { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 4, fontSize: 12, opacity: 0.6 },
+  statusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingTop: 8, paddingBottom: 4 },
+  resultCount: { fontSize: 12, opacity: 0.6 },
+  errorBanner: { marginHorizontal: 12, padding: 10, borderRadius: 6, backgroundColor: 'rgba(220,80,80,0.15)' },
+  errorText: { color: '#c44', fontSize: 13 },
   listContent: { paddingHorizontal: 8, paddingBottom: 16 },
   gridRow: { gap: 8, paddingHorizontal: 4 },
   card: { flex: 1, marginBottom: 12, gap: 4 },

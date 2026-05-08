@@ -5,7 +5,7 @@ import { FlatList, Pressable, StyleSheet } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { getCachedTopAnime } from '@/src/services/anilist';
+import { getCachedCategory, type Category } from '@/src/services/anilist';
 import { loadFavorites } from '@/src/services/favorites';
 import { AnimeDetail } from '@/src/types/anime';
 
@@ -17,14 +17,19 @@ export default function FavoritesScreen() {
     useCallback(() => {
       let cancelled = false;
       (async () => {
-        const [favSet, cached] = await Promise.all([loadFavorites(), getCachedTopAnime()]);
+        const cats: Category[] = ['top', 'trending', 'hentai'];
+        const [favSet, ...caches] = await Promise.all([
+          loadFavorites(),
+          ...cats.map((c) => getCachedCategory(c)),
+        ]);
         if (cancelled) return;
-        if (!cached) {
-          setItems([]);
-          setLoaded(true);
-          return;
+        const byAid = new Map<number, AnimeDetail>();
+        for (const cache of caches) {
+          if (!cache) continue;
+          for (const a of cache) {
+            if (!byAid.has(a.aid)) byAid.set(a.aid, a);
+          }
         }
-        const byAid = new Map(cached.map((a) => [a.aid, a]));
         const list: AnimeDetail[] = [];
         for (const aid of favSet) {
           const a = byAid.get(aid);
