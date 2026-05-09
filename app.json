@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "anidb-launcher-mobile",
+    "name": "Anime DB",
     "slug": "anidb-launcher-mobile",
     "version": "0.2.0",
     "orientation": "portrait",
@@ -12,6 +12,13 @@
       "supportsTablet": true
     },
     "android": {
+      "versionCode": 4,
+      "blockedPermissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#0e0f10",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

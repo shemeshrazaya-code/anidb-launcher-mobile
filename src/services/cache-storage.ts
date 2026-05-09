@@ -82,14 +82,30 @@ export async function migrateAsyncStorageKeys(prefix: string): Promise<{
 
   const matching = allKeys.filter((k) => k.startsWith(prefix));
   for (const key of matching) {
+    let shouldRemove = true;
+    let raw: string | null = null;
+
     try {
-      const raw = await AsyncStorage.getItem(key);
-      if (raw != null) {
+      raw = await AsyncStorage.getItem(key);
+    } catch {
+      failed += 1;
+    }
+
+    if (raw != null) {
+      try {
         await ensureDir();
         const uri = uriFor(key);
         await FileSystem.writeAsStringAsync(uri, raw);
         migrated += 1;
+      } catch {
+        failed += 1;
+        shouldRemove = false;
       }
+    }
+
+    if (!shouldRemove) continue;
+
+    try {
       await AsyncStorage.removeItem(key);
       removed += 1;
     } catch {
