@@ -14,12 +14,13 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Brand } from '@/constants/theme';
+import { Brand, Colors } from '@/constants/theme';
 import { useThemeColor } from '@/hooks/use-theme-color';
 
 const SPONSOR_URL = 'https://github.com/sponsors/shemeshrazaya-code';
 
 import { CategorySheet } from '@/components/category-sheet';
+import { GenreFilterSheet } from '@/components/genre-filter-sheet';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import {
@@ -46,7 +47,8 @@ export default function BrowseScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
-  const [activeGenre, setActiveGenre] = useState<string | null>(null);
+  const [activeGenres, setActiveGenres] = useState<Set<string>>(new Set());
+  const [genreSheetOpen, setGenreSheetOpen] = useState(false);
   const [searchResults, setSearchResults] = useState<AnimeDetail[] | null>(null);
   const [searching, setSearching] = useState(false);
   const searchSeq = useRef(0);
@@ -54,7 +56,7 @@ export default function BrowseScreen() {
   const fetchSignal = useRef<{ cancelled: boolean } | null>(null);
 
   useEffect(() => {
-    setActiveGenre(null);
+    setActiveGenres(new Set());
     setItems(null);
     setError(null);
     setProgress(null);
@@ -152,24 +154,28 @@ export default function BrowseScreen() {
   const inSearchMode = filter.trim().length > 0;
 
   const genres = useMemo(() => {
-    if (!items || inSearchMode) return [];
+    if (!items) return [];
     const counts = new Map<string, number>();
     for (const a of items) {
       for (const g of a.genres ?? []) counts.set(g, (counts.get(g) ?? 0) + 1);
     }
     return Array.from(counts.entries())
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 20)
       .map(([name]) => name);
-  }, [items, inSearchMode]);
+  }, [items]);
 
   const visible = useMemo(() => {
     if (inSearchMode) return searchResults ?? [];
     if (!items) return [];
-    return activeGenre
-      ? items.filter((a) => (a.genres ?? []).includes(activeGenre))
-      : items;
-  }, [items, searchResults, inSearchMode, activeGenre]);
+    if (activeGenres.size === 0) return items;
+    return items.filter((a) => {
+      const itemGenres = a.genres ?? [];
+      for (const g of itemGenres) {
+        if (activeGenres.has(g)) return true;
+      }
+      return false;
+    });
+  }, [items, searchResults, inSearchMode, activeGenres]);
 
   if (items == null && !error && !inSearchMode) {
     return <SkeletonBrowse label={currentCategoryDef?.name ?? category} />;
@@ -235,27 +241,52 @@ export default function BrowseScreen() {
           </ThemedText>
         </Pressable>
       </ThemedView>
-      {!inSearchMode && genres.length > 0 && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.genreScroll}
-          contentContainerStyle={styles.genreScrollContent}>
-          <GenreChip
-            label="All"
-            active={activeGenre == null}
-            onPress={() => setActiveGenre(null)}
-          />
-          {genres.map((g) => (
-            <GenreChip
-              key={g}
-              label={g}
-              active={activeGenre === g}
-              onPress={() => setActiveGenre(activeGenre === g ? null : g)}
-            />
-          ))}
-        </ScrollView>
+      {!inSearchMode && (
+        <View style={styles.genreButtonRow}>
+          <Pressable
+            onPress={() => setGenreSheetOpen(true)}
+            style={({ pressed }) => [
+              styles.genreButton,
+              { backgroundColor: surfaceColor, borderColor },
+              activeGenres.size > 0 && styles.genreButtonActive,
+              pressed && styles.genreButtonPressed,
+            ]}>
+            <ThemedText style={styles.genreButtonLabel}>Genres</ThemedText>
+            <ThemedText
+              style={[
+                styles.genreButtonValue,
+                activeGenres.size === 0 && styles.genreButtonValueAll,
+              ]}
+              numberOfLines={1}>
+              {activeGenres.size === 0
+                ? 'All'
+                : activeGenres.size === 1
+                  ? Array.from(activeGenres)[0]
+                  : `${activeGenres.size} selected`}
+            </ThemedText>
+            {activeGenres.size > 0 ? (
+              <Pressable
+                onPress={(e) => {
+                  e.stopPropagation();
+                  setActiveGenres(new Set());
+                }}
+                hitSlop={8}
+                style={styles.genreClearInline}>
+                <ThemedText style={styles.genreClearInlineText}>×</ThemedText>
+              </Pressable>
+            ) : (
+              <ThemedText style={styles.genreButtonChevron}>▾</ThemedText>
+            )}
+          </Pressable>
+        </View>
       )}
+      <GenreFilterSheet
+        visible={genreSheetOpen}
+        available={genres}
+        selected={activeGenres}
+        onChange={setActiveGenres}
+        onClose={() => setGenreSheetOpen(false)}
+      />
       {progress && !inSearchMode ? (
         <View style={styles.progressTrack}>
           <View
@@ -278,7 +309,13 @@ export default function BrowseScreen() {
         ) : (
           <ThemedText style={styles.resultCount}>
             {visible.length} {visible.length === 1 ? 'result' : 'results'}
-            {inSearchMode ? ` for "${filter.trim()}"` : activeGenre ? ` · ${activeGenre}` : ''}
+            {inSearchMode
+              ? ` for "${filter.trim()}"`
+              : activeGenres.size === 1
+                ? ` · ${Array.from(activeGenres)[0]}`
+                : activeGenres.size > 1
+                  ? ` · ${activeGenres.size} genres`
+                  : ''}
           </ThemedText>
         )}
       </ThemedView>
@@ -315,28 +352,6 @@ export default function BrowseScreen() {
         keyboardShouldPersistTaps="handled"
       />
     </ThemedView>
-  );
-}
-
-function GenreChip({
-  label,
-  active,
-  onPress,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.chip,
-        active && styles.chipActive,
-        pressed && styles.chipPressed,
-      ]}>
-      <ThemedText style={[styles.chipText, active && styles.chipTextActive]}>{label}</ThemedText>
-    </Pressable>
   );
 }
 
@@ -480,18 +495,31 @@ const styles = StyleSheet.create({
   refreshBtnDisabled: { opacity: 0.4 },
   refreshBtnText: { fontSize: 18, fontWeight: '600' },
   refreshBtnTextActive: { color: Brand.primaryLight },
-  genreScroll: { marginTop: 8, flexGrow: 0, flexShrink: 0 },
-  genreScrollContent: { paddingHorizontal: 12, paddingVertical: 4, gap: 6, alignItems: 'center', minHeight: 36 },
-  chip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: 'rgba(127,127,127,0.12)',
+  genreButtonRow: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 },
+  genreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 10,
   },
-  chipActive: { backgroundColor: Brand.primary },
-  chipPressed: { opacity: 0.6 },
-  chipText: { fontSize: 13, opacity: 0.85 },
-  chipTextActive: { color: '#fff', opacity: 1, fontWeight: '600' },
+  genreButtonActive: { borderColor: Brand.primary },
+  genreButtonPressed: { opacity: 0.85 },
+  genreButtonLabel: { fontSize: 12, opacity: 0.55, textTransform: 'uppercase', letterSpacing: 0.5 },
+  genreButtonValue: { fontSize: 14, fontWeight: '600', flex: 1, color: Brand.primaryLight },
+  genreButtonValueAll: { color: Colors.dark.text, opacity: 0.7, fontWeight: '500' },
+  genreButtonChevron: { fontSize: 14, opacity: 0.55 },
+  genreClearInline: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.10)',
+  },
+  genreClearInlineText: { fontSize: 16, lineHeight: 18, fontWeight: '700' },
   progressTrack: {
     height: 2,
     marginHorizontal: 12,
