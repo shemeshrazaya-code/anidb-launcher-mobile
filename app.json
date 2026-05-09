@@ -2,7 +2,7 @@
   "expo": {
     "name": "anidb-launcher-mobile",
     "slug": "anidb-launcher-mobile",
-    "version": "0.1.2",
+    "version": "0.2.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "anidblaunchermobile",

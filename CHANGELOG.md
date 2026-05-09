@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## v0.2.0 — 2026-05-08
+
+A real-app-feel pass: visual identity, twelve categories with a searchable picker, three new sheets (category / genre filter / sources import), pickable backgrounds, donations, and a fix for the SQLite-full crash on heavy users.
 
 ### Fixed
 - **`SQLiteFullException: database or disk is full`** when loading multiple categories. AsyncStorage's SQLite backing has a default limit around 6MB on Android, and 12 categories × thousands of items each (each ~900B with title, description, posterUrl, genres, alt titles) can easily blow past that. Migrated all AniList category caches off AsyncStorage to `expo-file-system` (no size limit beyond device free space). New `src/services/cache-storage.ts` exposes `readCacheJson` / `writeCacheJson` / `removeCache` plus a one-shot `migrateAsyncStorageKeys('anilist-cache-')` that runs on app start to move any existing caches from the broken SQLite backing to the new file-system backing and free the SQLite slots. Small key/value (sources, favorites, settings, background config) stays on AsyncStorage.
