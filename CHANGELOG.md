@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.3.0 — 2026-05-09
+
+### Added
+- Browse now has a **Starred** filter, so you can narrow any category or search down to favorited titles without leaving the screen.
+- Favorited anime now show a small star badge on Browse cards.
+- The Browse header now uses a custom Anime DB SVG wordmark instead of plain text.
+- Settings now previews pasted source URLs and can infer `{query}` from a normal search results URL.
+
+### Changed
+- Browse search is now local-first and deferred, so cached results appear immediately while AniList search merges in after typing settles.
+- The bottom navigation has larger touch targets, active pills, haptics, and stronger icon states.
+- The default background is now the calmer Midnight aurora preset, with the older presets still available in Settings.
+- First-run source setup is simpler: paste a search URL and Anime DB normalizes it for reuse.
+
 ## v0.2.1 — 2026-05-09
 
 ### Fixed
