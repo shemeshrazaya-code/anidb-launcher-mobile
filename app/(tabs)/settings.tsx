@@ -7,18 +7,21 @@ import {
   Alert,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   TextInput,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ImportSourcesSheet } from '@/components/import-sources-sheet';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Brand } from '@/constants/theme';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { BACKGROUND_PRESETS, useAppBackground } from '@/src/services/background';
-import { addSource, loadSources, removeSource } from '@/src/services/sources';
+import { addSource, loadSources, removeSource, saveSources } from '@/src/services/sources';
+import { mergeSources, serializeSources } from '@/src/services/sources-share';
 import { Source, validateSource } from '@/src/types/source';
 
 const REPO_URL = 'https://github.com/shemeshrazaya-code/anidb-launcher-mobile';
@@ -35,6 +38,44 @@ export default function SettingsScreen() {
   const [sources, setSources] = useState<Source[]>([]);
   const [name, setName] = useState('');
   const [tmpl, setTmpl] = useState('');
+  const [importOpen, setImportOpen] = useState(false);
+
+  const onExport = useCallback(async () => {
+    if (sources.length === 0) {
+      Alert.alert('Nothing to share', 'Add at least one source first.');
+      return;
+    }
+    const json = serializeSources(sources);
+    try {
+      await Share.share({
+        message: json,
+        title: `Anime DB sources (${sources.length})`,
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      Alert.alert('Could not share', msg);
+    }
+  }, [sources]);
+
+  const onMergeImport = useCallback(
+    async (incoming: Source[]) => {
+      const { merged, added, skipped } = mergeSources(sources, incoming);
+      await saveSources(merged);
+      setSources(merged);
+      Alert.alert(
+        'Imported',
+        `Added ${added} new source${added === 1 ? '' : 's'}` +
+          (skipped > 0 ? `, skipped ${skipped} duplicate${skipped === 1 ? '' : 's'}.` : '.'),
+      );
+    },
+    [sources],
+  );
+
+  const onReplaceImport = useCallback(async (incoming: Source[]) => {
+    await saveSources(incoming);
+    setSources(incoming);
+    Alert.alert('Replaced', `Installed ${incoming.length} source${incoming.length === 1 ? '' : 's'}.`);
+  }, []);
 
   const onPickBackground = useCallback(async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -103,6 +144,18 @@ export default function SettingsScreen() {
         <ThemedText style={styles.help}>
           Bring your own search URLs. Use {'{query}'} where the title goes.
         </ThemedText>
+        <View style={styles.shareRow}>
+          <Pressable
+            onPress={onExport}
+            style={({ pressed }) => [styles.shareBtn, pressed && styles.shareBtnPressed]}>
+            <ThemedText style={styles.shareBtnText}>Share my list</ThemedText>
+          </Pressable>
+          <Pressable
+            onPress={() => setImportOpen(true)}
+            style={({ pressed }) => [styles.shareBtn, pressed && styles.shareBtnPressed]}>
+            <ThemedText style={styles.shareBtnText}>Import…</ThemedText>
+          </Pressable>
+        </View>
       </ThemedView>
 
       <ThemedView style={styles.section}>
@@ -245,6 +298,14 @@ export default function SettingsScreen() {
           Free, FOSS, no ads. Sponsorships are optional and appreciated.
         </ThemedText>
       </ThemedView>
+
+      <ImportSourcesSheet
+        visible={importOpen}
+        existingCount={sources.length}
+        onMerge={onMergeImport}
+        onReplace={onReplaceImport}
+        onClose={() => setImportOpen(false)}
+      />
     </ScrollView>
   );
 }
@@ -324,4 +385,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   bgClearText: { color: '#e57373', fontSize: 14, fontWeight: '600' },
+  shareRow: { flexDirection: 'row', gap: 10, marginTop: 4 },
+  shareBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: 'rgba(139,92,246,0.10)',
+    borderWidth: 1,
+    borderColor: Brand.primary,
+    alignItems: 'center',
+  },
+  shareBtnPressed: { opacity: 0.7 },
+  shareBtnText: { color: Brand.primaryLight, fontSize: 13, fontWeight: '600' },
 });
