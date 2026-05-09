@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.2.1 — 2026-05-09
+
+### Fixed
+- Recovery from oversized AniList cache rows now deletes unreadable legacy AsyncStorage entries, so upgraded installs can escape the SQLite `CursorWindow` failure instead of hitting it on every launch.
+
+### Changed
+- Android release metadata now uses the user-facing **Anime DB** app label, bumps `versionCode` to 5, and removes unused camera, audio, overlay, and write-external-storage permissions from release builds.
+
 ## v0.2.0 — 2026-05-08
 
 A real-app-feel pass: visual identity, twelve categories with a searchable picker, three new sheets (category / genre filter / sources import), pickable backgrounds, donations, and a fix for the SQLite-full crash on heavy users.
