@@ -25,31 +25,17 @@ const MEDIA_FIELDS = `
   isAdult
 `;
 
-const TOP_QUERY = `query ($page: Int, $perPage: Int) {
+const BROWSE_QUERY = `query (
+  $page: Int,
+  $perPage: Int,
+  $sort: [MediaSort],
+  $status: MediaStatus,
+  $format: MediaFormat,
+  $genres: [String]
+) {
   Page(page: $page, perPage: $perPage) {
     pageInfo { hasNextPage currentPage total }
-    media(type: ANIME, sort: POPULARITY_DESC) { ${MEDIA_FIELDS} }
-  }
-}`;
-
-const TRENDING_QUERY = `query ($page: Int, $perPage: Int) {
-  Page(page: $page, perPage: $perPage) {
-    pageInfo { hasNextPage currentPage total }
-    media(type: ANIME, sort: TRENDING_DESC) { ${MEDIA_FIELDS} }
-  }
-}`;
-
-const HENTAI_POPULARITY_QUERY = `query ($page: Int, $perPage: Int) {
-  Page(page: $page, perPage: $perPage) {
-    pageInfo { hasNextPage currentPage total }
-    media(type: ANIME, sort: POPULARITY_DESC, genre_in: ["Hentai"]) { ${MEDIA_FIELDS} }
-  }
-}`;
-
-const HENTAI_SCORE_QUERY = `query ($page: Int, $perPage: Int) {
-  Page(page: $page, perPage: $perPage) {
-    pageInfo { hasNextPage currentPage total }
-    media(type: ANIME, sort: SCORE_DESC, genre_in: ["Hentai"]) { ${MEDIA_FIELDS} }
+    media(type: ANIME, sort: $sort, status: $status, format: $format, genre_in: $genres) { ${MEDIA_FIELDS} }
   }
 }`;
 
@@ -60,36 +46,122 @@ const SEARCH_QUERY = `query ($search: String, $page: Int, $perPage: Int, $isAdul
   }
 }`;
 
-export type Category = 'top' | 'trending' | 'hentai';
+export type CategoryId = string;
+/** Backwards-compat alias - some screens still import `Category`. */
+export type Category = CategoryId;
 
-interface QueryPhase {
-  query: string;
+export interface CategoryPhase {
+  vars: Record<string, unknown>;
   pages: number;
   label: string;
 }
 
-interface CategoryConfig {
-  phases: QueryPhase[];
+export interface CategoryDef {
+  id: CategoryId;
+  name: string;
+  description: string;
+  phases: CategoryPhase[];
   cacheKey: string;
+  /** Marks adult-only categories for opt-in gating. */
+  adult?: boolean;
 }
 
-const CATEGORIES: Record<Category, CategoryConfig> = {
-  top: {
+export const CATEGORIES: CategoryDef[] = [
+  {
+    id: 'top',
+    name: 'Top Popular',
+    description: 'All-time most popular anime on AniList',
+    phases: [{ vars: { sort: ['POPULARITY_DESC'] }, pages: 60, label: 'top popular' }],
     cacheKey: 'anilist-cache-top-v2',
-    phases: [{ query: TOP_QUERY, pages: 60, label: 'top' }],
   },
-  trending: {
+  {
+    id: 'trending',
+    name: 'Trending Now',
+    description: "What's hot this week",
+    phases: [{ vars: { sort: ['TRENDING_DESC'] }, pages: 20, label: 'trending' }],
     cacheKey: 'anilist-cache-trending-v2',
-    phases: [{ query: TRENDING_QUERY, pages: 20, label: 'trending' }],
   },
-  hentai: {
-    cacheKey: 'anilist-cache-hentai-v2',
+  {
+    id: 'top-rated',
+    name: 'Top Rated',
+    description: 'Highest AniList user scores',
+    phases: [{ vars: { sort: ['SCORE_DESC'] }, pages: 25, label: 'top rated' }],
+    cacheKey: 'anilist-cache-top-rated-v1',
+  },
+  {
+    id: 'most-favorited',
+    name: 'Most Favorited',
+    description: "Most-favorited by AniList users",
+    phases: [{ vars: { sort: ['FAVOURITES_DESC'] }, pages: 25, label: 'most favorited' }],
+    cacheKey: 'anilist-cache-most-favorited-v1',
+  },
+  {
+    id: 'currently-airing',
+    name: 'Currently Airing',
+    description: 'Anime running this season',
+    phases: [{ vars: { sort: ['POPULARITY_DESC'], status: 'RELEASING' }, pages: 15, label: 'airing' }],
+    cacheKey: 'anilist-cache-airing-v1',
+  },
+  {
+    id: 'upcoming',
+    name: 'Upcoming',
+    description: 'Announced and not yet released',
+    phases: [{ vars: { sort: ['POPULARITY_DESC'], status: 'NOT_YET_RELEASED' }, pages: 10, label: 'upcoming' }],
+    cacheKey: 'anilist-cache-upcoming-v1',
+  },
+  {
+    id: 'newest',
+    name: 'Newest Releases',
+    description: 'Most recently aired',
+    phases: [{ vars: { sort: ['START_DATE_DESC'], status: 'FINISHED' }, pages: 20, label: 'newest' }],
+    cacheKey: 'anilist-cache-newest-v1',
+  },
+  {
+    id: 'movies',
+    name: 'Movies',
+    description: 'Theatrical and feature-length anime',
+    phases: [{ vars: { sort: ['POPULARITY_DESC'], format: 'MOVIE' }, pages: 25, label: 'movies' }],
+    cacheKey: 'anilist-cache-movies-v1',
+  },
+  {
+    id: 'tv-series',
+    name: 'TV Series',
+    description: 'Anime TV series',
+    phases: [{ vars: { sort: ['POPULARITY_DESC'], format: 'TV' }, pages: 30, label: 'tv series' }],
+    cacheKey: 'anilist-cache-tv-v1',
+  },
+  {
+    id: 'ovas',
+    name: 'OVAs',
+    description: 'Original Video Animations',
+    phases: [{ vars: { sort: ['POPULARITY_DESC'], format: 'OVA' }, pages: 15, label: 'ovas' }],
+    cacheKey: 'anilist-cache-ovas-v1',
+  },
+  {
+    id: 'specials',
+    name: 'Specials',
+    description: 'TV specials and promotional shorts',
+    phases: [{ vars: { sort: ['POPULARITY_DESC'], format: 'SPECIAL' }, pages: 10, label: 'specials' }],
+    cacheKey: 'anilist-cache-specials-v1',
+  },
+  {
+    id: 'hentai',
+    name: 'Hentai',
+    description: 'Adult anime — popularity and score blend',
     phases: [
-      { query: HENTAI_POPULARITY_QUERY, pages: 40, label: 'hentai (popular)' },
-      { query: HENTAI_SCORE_QUERY, pages: 30, label: 'hentai (top-rated)' },
+      { vars: { sort: ['POPULARITY_DESC'], genres: ['Hentai'] }, pages: 40, label: 'hentai (popular)' },
+      { vars: { sort: ['SCORE_DESC'], genres: ['Hentai'] }, pages: 30, label: 'hentai (top-rated)' },
     ],
+    cacheKey: 'anilist-cache-hentai-v2',
+    adult: true,
   },
-};
+];
+
+export const DEFAULT_CATEGORY: CategoryId = 'top';
+
+export function getCategoryDef(id: CategoryId): CategoryDef | undefined {
+  return CATEGORIES.find((c) => c.id === id);
+}
 
 interface AniListMedia {
   id: number;
@@ -126,7 +198,7 @@ interface CacheEnvelope {
 }
 
 export interface FetchProgress {
-  category: Category;
+  category: CategoryId;
   phase: string;
   pageDone: number;
   totalPages: number;
@@ -243,8 +315,10 @@ interface FetchOptions {
   signal?: { cancelled: boolean };
 }
 
-export async function getCategory(category: Category, opts: FetchOptions = {}): Promise<AnimeDetail[]> {
-  const { cacheKey, phases } = CATEGORIES[category];
+export async function getCategory(category: CategoryId, opts: FetchOptions = {}): Promise<AnimeDetail[]> {
+  const def = getCategoryDef(category);
+  if (!def) throw new AniListError(`Unknown category: ${category}`);
+  const { cacheKey, phases } = def;
   const cached = await readJson<CacheEnvelope | null>(cacheKey, null);
   const fresh = cached && Date.now() - cached.fetchedAt < CACHE_MAX_AGE_MS;
   if (cached && fresh && cached.full && !opts.forceRefresh) {
@@ -262,9 +336,10 @@ export async function getCategory(category: Category, opts: FetchOptions = {}): 
         await writeJson<CacheEnvelope>(cacheKey, { fetchedAt: Date.now(), items: out, full: false });
         return out;
       }
-      const data = await postGraphql<AniListPageResponse['data']>(phase.query, {
+      const data = await postGraphql<AniListPageResponse['data']>(BROWSE_QUERY, {
         page,
         perPage: 50,
+        ...phase.vars,
       });
       for (const m of data.Page.media) {
         if (m.id == null || seen.has(m.id)) continue;
@@ -296,15 +371,17 @@ export async function getCategory(category: Category, opts: FetchOptions = {}): 
   return out;
 }
 
-export async function getCachedCategory(category: Category): Promise<AnimeDetail[] | null> {
-  const cached = await readJson<CacheEnvelope | null>(CATEGORIES[category].cacheKey, null);
+export async function getCachedCategory(category: CategoryId): Promise<AnimeDetail[] | null> {
+  const def = getCategoryDef(category);
+  if (!def) return null;
+  const cached = await readJson<CacheEnvelope | null>(def.cacheKey, null);
   return cached ? cached.items : null;
 }
 
 export async function getCachedAnyCategory(aid: number): Promise<AnimeDetail | null> {
-  for (const cat of Object.keys(CATEGORIES) as Category[]) {
-    const items = await getCachedCategory(cat);
-    const found = items?.find((a) => a.aid === aid);
+  for (const def of CATEGORIES) {
+    const cached = await readJson<CacheEnvelope | null>(def.cacheKey, null);
+    const found = cached?.items.find((a) => a.aid === aid);
     if (found) return found;
   }
   return null;

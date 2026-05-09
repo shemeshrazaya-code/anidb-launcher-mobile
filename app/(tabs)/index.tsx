@@ -19,22 +19,19 @@ import { useThemeColor } from '@/hooks/use-theme-color';
 
 const SPONSOR_URL = 'https://github.com/sponsors/shemeshrazaya-code';
 
+import { CategorySheet } from '@/components/category-sheet';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import {
-  Category,
+  CategoryId,
+  DEFAULT_CATEGORY,
   FetchProgress,
   getCachedCategory,
   getCategory,
+  getCategoryDef,
   searchAnime,
 } from '@/src/services/anilist';
 import { AnimeDetail } from '@/src/types/anime';
-
-const CATEGORY_LABELS: Record<Category, string> = {
-  top: 'Top',
-  trending: 'Trending',
-  hentai: 'Hentai',
-};
 
 export default function BrowseScreen() {
   const insets = useSafeAreaInsets();
@@ -42,7 +39,9 @@ export default function BrowseScreen() {
   const borderColor = useThemeColor({}, 'border');
   const textColor = useThemeColor({}, 'text');
   const mutedColor = useThemeColor({}, 'muted');
-  const [category, setCategory] = useState<Category>('top');
+  const [category, setCategory] = useState<CategoryId>(DEFAULT_CATEGORY);
+  const [categorySheetOpen, setCategorySheetOpen] = useState(false);
+  const currentCategoryDef = getCategoryDef(category);
   const [items, setItems] = useState<AnimeDetail[] | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -104,7 +103,7 @@ export default function BrowseScreen() {
     setSearching(true);
     const timer = setTimeout(async () => {
       try {
-        const results = await searchAnime(q, { includeAdult: category === 'hentai' });
+        const results = await searchAnime(q, { includeAdult: !!currentCategoryDef?.adult });
         if (seq === searchSeq.current) {
           setSearchResults(results);
           setSearching(false);
@@ -173,7 +172,7 @@ export default function BrowseScreen() {
   }, [items, searchResults, inSearchMode, activeGenre]);
 
   if (items == null && !error && !inSearchMode) {
-    return <SkeletonBrowse label={CATEGORY_LABELS[category]} />;
+    return <SkeletonBrowse label={currentCategoryDef?.name ?? category} />;
   }
 
   return (
@@ -181,30 +180,29 @@ export default function BrowseScreen() {
       <View style={styles.appHeader}>
         <ThemedText style={styles.appTitle}>Anime DB</ThemedText>
       </View>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.categoryRow}
-        contentContainerStyle={styles.categoryRowContent}>
-        {(Object.keys(CATEGORY_LABELS) as Category[]).map((c) => (
-          <Pressable
-            key={c}
-            onPress={() => setCategory(c)}
-            style={({ pressed }) => [
-              styles.categoryPill,
-              category === c && styles.categoryPillActive,
-              pressed && styles.chipPressed,
-            ]}>
-            <ThemedText
-              style={[
-                styles.categoryPillText,
-                category === c && styles.categoryPillTextActive,
-              ]}>
-              {CATEGORY_LABELS[c]}
+      <View style={styles.categoryButtonRow}>
+        <Pressable
+          onPress={() => setCategorySheetOpen(true)}
+          style={({ pressed }) => [
+            styles.categoryButton,
+            { backgroundColor: surfaceColor, borderColor },
+            pressed && styles.categoryButtonPressed,
+          ]}>
+          <View style={styles.categoryButtonText}>
+            <ThemedText style={styles.categoryButtonLabel}>Category</ThemedText>
+            <ThemedText style={styles.categoryButtonValue} numberOfLines={1}>
+              {currentCategoryDef?.name ?? 'Choose…'}
             </ThemedText>
-          </Pressable>
-        ))}
-      </ScrollView>
+          </View>
+          <ThemedText style={styles.categoryButtonChevron}>▾</ThemedText>
+        </Pressable>
+      </View>
+      <CategorySheet
+        visible={categorySheetOpen}
+        selectedId={category}
+        onSelect={setCategory}
+        onClose={() => setCategorySheetOpen(false)}
+      />
       <ThemedView style={styles.searchBar}>
         <TextInput
           placeholder="Search AniList…"
@@ -446,17 +444,21 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 0.5,
   },
-  categoryRow: { marginTop: 4, flexGrow: 0, flexShrink: 0 },
-  categoryRowContent: { paddingHorizontal: 12, paddingVertical: 8, gap: 8, alignItems: 'center', minHeight: 56 },
-  categoryPill: {
-    paddingHorizontal: 18,
-    paddingVertical: 9,
-    borderRadius: 999,
-    backgroundColor: 'rgba(127,127,127,0.12)',
+  categoryButtonRow: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 4 },
+  categoryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 12,
   },
-  categoryPillActive: { backgroundColor: Brand.primary },
-  categoryPillText: { fontSize: 14, opacity: 0.85, fontWeight: '600' },
-  categoryPillTextActive: { color: '#fff', opacity: 1 },
+  categoryButtonPressed: { opacity: 0.85 },
+  categoryButtonText: { flex: 1, gap: 1 },
+  categoryButtonLabel: { fontSize: 11, opacity: 0.55, textTransform: 'uppercase', letterSpacing: 0.6 },
+  categoryButtonValue: { fontSize: 15, fontWeight: '700', color: Brand.primaryLight },
+  categoryButtonChevron: { fontSize: 16, opacity: 0.6 },
   searchBar: { paddingHorizontal: 12, paddingTop: 8, flexDirection: 'row', gap: 8, alignItems: 'center' },
   searchInput: {
     flex: 1,

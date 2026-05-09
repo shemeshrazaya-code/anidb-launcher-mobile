@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { getCachedCategory, type Category } from '@/src/services/anilist';
+import { CATEGORIES, getCachedCategory } from '@/src/services/anilist';
 import { loadFavorites } from '@/src/services/favorites';
 import { AnimeDetail } from '@/src/types/anime';
 
@@ -19,10 +19,9 @@ export default function FavoritesScreen() {
     useCallback(() => {
       let cancelled = false;
       (async () => {
-        const cats: Category[] = ['top', 'trending', 'hentai'];
         const [favSet, ...caches] = await Promise.all([
           loadFavorites(),
-          ...cats.map((c) => getCachedCategory(c)),
+          ...CATEGORIES.map((c) => getCachedCategory(c.id)),
         ]);
         if (cancelled) return;
         const byAid = new Map<number, AnimeDetail>();

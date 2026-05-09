@@ -3,6 +3,8 @@
 ## Unreleased
 
 ### New
+- **All categories + searchable picker.** Browse now ships with 12 categories (Top Popular, Trending Now, Top Rated, Most Favorited, Currently Airing, Upcoming, Newest Releases, Movies, TV Series, OVAs, Specials, Hentai). The horizontal pill scroll is replaced by a single tappable "Category: <name>" button that opens a slide-up modal sheet with a search field — type to filter, tap to select. Each category has its own AsyncStorage cache, so switching back to a recently-viewed category is instant.
+- `src/services/anilist.ts` was refactored from three hardcoded queries to one parameterized `BROWSE_QUERY` driven by per-category `phases` with their own GraphQL variables (sort, status, format, genres). New `CATEGORIES` registry and `CategoryDef` / `CategoryId` exports.
 - **Branded app identity.** New custom app icon (DB Anime mark) + splash screen (anime character launcher art, dark base) wired through `app.json`. Replaces the default Expo icon and white splash.
 - **Snake-skin background.** Subtle SVG hexagonal-scale pattern with violet undertones tiled across all screens, behind all content. New `components/snake-skin-bg.tsx`. Added `react-native-svg` for the inline pattern.
 - **Forced dark theme.** `userInterfaceStyle: "dark"` in `app.json` — no more white-on-white in any system setting. Custom transparent-background dark theme on `@react-navigation/native`'s `ThemeProvider` so the snake-skin shows through every navigator scene.
