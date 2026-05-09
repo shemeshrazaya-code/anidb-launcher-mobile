@@ -4,7 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { View } from 'react-native';
 import 'react-native-reanimated';
 
-import { SnakeSkinBg } from '@/components/snake-skin-bg';
+import { AppBackground } from '@/components/app-background';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -23,7 +23,7 @@ export default function RootLayout() {
   return (
     <ThemeProvider value={TransparentDarkTheme}>
       <View style={{ flex: 1 }}>
-        <SnakeSkinBg />
+        <AppBackground />
         <Stack screenOptions={{ contentStyle: { backgroundColor: 'transparent' } }}>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="anime/[aid]" options={{ title: '' }} />

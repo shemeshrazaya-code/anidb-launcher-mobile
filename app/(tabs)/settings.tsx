@@ -1,4 +1,5 @@
 import Constants from 'expo-constants';
+import * as ImagePicker from 'expo-image-picker';
 import * as Linking from 'expo-linking';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
@@ -16,6 +17,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Brand } from '@/constants/theme';
 import { useThemeColor } from '@/hooks/use-theme-color';
+import { BACKGROUND_PRESETS, useAppBackground } from '@/src/services/background';
 import { addSource, loadSources, removeSource } from '@/src/services/sources';
 import { Source, validateSource } from '@/src/types/source';
 
@@ -29,9 +31,26 @@ export default function SettingsScreen() {
   const borderColor = useThemeColor({}, 'border');
   const textColor = useThemeColor({}, 'text');
   const mutedColor = useThemeColor({}, 'muted');
+  const { config: bgConfig, setVariant: setBgVariant, setCustomUri: setBgCustomUri, clearCustom: clearBgCustom } = useAppBackground();
   const [sources, setSources] = useState<Source[]>([]);
   const [name, setName] = useState('');
   const [tmpl, setTmpl] = useState('');
+
+  const onPickBackground = useCallback(async () => {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert('Photos permission needed', 'Allow photo access to use a custom background.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.85,
+      allowsEditing: false,
+    });
+    if (!result.canceled && result.assets[0]?.uri) {
+      await setBgCustomUri(result.assets[0].uri);
+    }
+  }, [setBgCustomUri]);
 
   const refresh = useCallback(async () => {
     setSources(await loadSources());
@@ -139,6 +158,74 @@ export default function SettingsScreen() {
       </ThemedView>
 
       <ThemedView style={styles.section}>
+        <ThemedText type="subtitle">Background</ThemedText>
+        <ThemedText style={styles.help}>
+          Pick a preset or use one of your photos. Custom photos are dimmed for readability.
+        </ThemedText>
+        {BACKGROUND_PRESETS.map((p) => {
+          const active = bgConfig.variant === p.variant;
+          return (
+            <Pressable
+              key={p.variant}
+              onPress={() => setBgVariant(p.variant)}
+              style={({ pressed }) => [
+                styles.bgRow,
+                { backgroundColor: surfaceColor, borderColor },
+                active && styles.bgRowActive,
+                pressed && styles.bgRowPressed,
+              ]}>
+              <View style={styles.bgRowText}>
+                <ThemedText
+                  style={[styles.bgRowName, active && styles.bgRowNameActive]}>
+                  {p.name}
+                </ThemedText>
+                <ThemedText style={styles.bgRowDesc}>{p.description}</ThemedText>
+              </View>
+              {active ? <ThemedText style={styles.bgCheck}>✓</ThemedText> : null}
+            </Pressable>
+          );
+        })}
+        <Pressable
+          onPress={onPickBackground}
+          style={({ pressed }) => [
+            styles.bgRow,
+            { backgroundColor: surfaceColor, borderColor },
+            bgConfig.variant === 'custom' && styles.bgRowActive,
+            pressed && styles.bgRowPressed,
+          ]}>
+          <View style={styles.bgRowText}>
+            <ThemedText
+              style={[
+                styles.bgRowName,
+                bgConfig.variant === 'custom' && styles.bgRowNameActive,
+              ]}>
+              {bgConfig.variant === 'custom' ? 'Custom photo' : 'Choose photo…'}
+            </ThemedText>
+            <ThemedText style={styles.bgRowDesc} numberOfLines={1}>
+              {bgConfig.variant === 'custom' && bgConfig.customUri
+                ? bgConfig.customUri
+                : 'Upload from your library'}
+            </ThemedText>
+          </View>
+          {bgConfig.variant === 'custom' ? (
+            <ThemedText style={styles.bgCheck}>✓</ThemedText>
+          ) : null}
+        </Pressable>
+        {bgConfig.variant === 'custom' ? (
+          <Pressable
+            onPress={() => {
+              Alert.alert('Remove custom background?', undefined, [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Remove', style: 'destructive', onPress: clearBgCustom },
+              ]);
+            }}
+            style={({ pressed }) => [styles.bgClearBtn, pressed && styles.bgRowPressed]}>
+            <ThemedText style={styles.bgClearText}>Remove custom photo</ThemedText>
+          </Pressable>
+        ) : null}
+      </ThemedView>
+
+      <ThemedView style={styles.section}>
         <ThemedText type="subtitle">About</ThemedText>
         <ThemedView style={styles.aboutRow}>
           <ThemedText style={styles.aboutLabel}>Version</ThemedText>
@@ -213,4 +300,28 @@ const styles = StyleSheet.create({
   },
   aboutLinkPressed: { opacity: 0.55 },
   aboutLinkText: { fontSize: 14, color: Brand.primaryLight, fontWeight: '500' },
+  bgRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 12,
+  },
+  bgRowActive: { borderColor: Brand.primary, backgroundColor: 'rgba(139,92,246,0.10)' },
+  bgRowPressed: { opacity: 0.7 },
+  bgRowText: { flex: 1, gap: 2 },
+  bgRowName: { fontSize: 15, fontWeight: '600' },
+  bgRowNameActive: { color: Brand.primaryLight },
+  bgRowDesc: { fontSize: 12, opacity: 0.6 },
+  bgCheck: { color: Brand.primaryLight, fontSize: 18, fontWeight: '700' },
+  bgClearBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    backgroundColor: 'rgba(220,80,80,0.12)',
+    alignItems: 'center',
+  },
+  bgClearText: { color: '#e57373', fontSize: 14, fontWeight: '600' },
 });
