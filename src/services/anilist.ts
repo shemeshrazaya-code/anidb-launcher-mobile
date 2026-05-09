@@ -2,7 +2,6 @@ import { AnimeDetail } from '@/src/types/anime';
 import { readJson, writeJson } from './storage';
 
 const API_URL = 'https://graphql.anilist.co';
-const CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const RATE_LIMIT_DELAY_MS = 1200;
 
 const BROWSER_UA =
@@ -320,8 +319,9 @@ export async function getCategory(category: CategoryId, opts: FetchOptions = {})
   if (!def) throw new AniListError(`Unknown category: ${category}`);
   const { cacheKey, phases } = def;
   const cached = await readJson<CacheEnvelope | null>(cacheKey, null);
-  const fresh = cached && Date.now() - cached.fetchedAt < CACHE_MAX_AGE_MS;
-  if (cached && fresh && cached.full && !opts.forceRefresh) {
+  // Trust cache forever absent forceRefresh. Partial caches (full !== true) still
+  // trigger a continue-from-where-we-left-off fetch.
+  if (cached && cached.full && !opts.forceRefresh) {
     return cached.items;
   }
 

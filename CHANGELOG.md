@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Changed
+- **Cache trusts itself forever.** Categories no longer hard-expire after 24 hours. Once a category is fully fetched, every subsequent visit loads from AsyncStorage instantly with zero network requests. The only way to re-fetch is to tap the ↻ button next to the search bar. Saves battery + bandwidth on phones; matches the desktop launcher's `--refresh`-only semantics. Partial caches (from interrupted fetches) still continue from where they left off on the next visit.
+
 ### New
 - **Share + import sources.** Two new buttons in Settings under the Sources section: **Share my list** wraps the user's source list in a versioned JSON envelope (`format: anime-db-sources/v1`) and opens the system Share sheet so it can be sent via Messages / Discord / email / wherever. **Import…** opens a slide-up sheet with a paste box (or one-tap "Paste from clipboard"), validates the JSON, previews the parsed source names, and offers two outcomes: **Replace all** (destructive, confirmed via Alert) or **Merge** (skips duplicates by name, case-insensitive). Both forms tolerate plain `[...]` arrays or older bundles missing the `format` field. New `src/services/sources-share.ts` (serialize/parse/merge) and `components/import-sources-sheet.tsx`.
 - **Multi-select genre filter.** The horizontal genre chip scroll on Browse is replaced with a single "Genres: \<n selected\>" button that opens a slide-up sheet with all genres available in the current category, in a wrap-layout multi-select grid. Filter logic switched from single-select-or-none to multi-select OR (an item matches if any of its genres are selected). The button shows the selected genre name when one is picked, "n selected" when more, and an inline "×" to clear without opening the sheet. The sheet has a Clear / Apply footer.
