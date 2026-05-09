@@ -1,5 +1,5 @@
 import { AnimeDetail } from '@/src/types/anime';
-import { readJson, writeJson } from './storage';
+import { readCacheJson, writeCacheJson } from './cache-storage';
 
 const API_URL = 'https://graphql.anilist.co';
 const RATE_LIMIT_DELAY_MS = 1200;
@@ -318,7 +318,7 @@ export async function getCategory(category: CategoryId, opts: FetchOptions = {})
   const def = getCategoryDef(category);
   if (!def) throw new AniListError(`Unknown category: ${category}`);
   const { cacheKey, phases } = def;
-  const cached = await readJson<CacheEnvelope | null>(cacheKey, null);
+  const cached = await readCacheJson<CacheEnvelope | null>(cacheKey, null);
   // Trust cache forever absent forceRefresh. Partial caches (full !== true) still
   // trigger a continue-from-where-we-left-off fetch.
   if (cached && cached.full && !opts.forceRefresh) {
@@ -333,7 +333,7 @@ export async function getCategory(category: CategoryId, opts: FetchOptions = {})
   for (const phase of phases) {
     for (let page = 1; page <= phase.pages; page += 1) {
       if (opts.signal?.cancelled) {
-        await writeJson<CacheEnvelope>(cacheKey, { fetchedAt: Date.now(), items: out, full: false });
+        await writeCacheJson<CacheEnvelope>(cacheKey, { fetchedAt: Date.now(), items: out, full: false });
         return out;
       }
       const data = await postGraphql<AniListPageResponse['data']>(BROWSE_QUERY, {
@@ -357,7 +357,7 @@ export async function getCategory(category: CategoryId, opts: FetchOptions = {})
       });
       // Save partial progress every 5 pages so a crash mid-fetch isn't lost
       if (pageDone % 5 === 0) {
-        await writeJson<CacheEnvelope>(cacheKey, {
+        await writeCacheJson<CacheEnvelope>(cacheKey, {
           fetchedAt: Date.now(),
           items: out,
           full: false,
@@ -367,20 +367,20 @@ export async function getCategory(category: CategoryId, opts: FetchOptions = {})
     }
   }
 
-  await writeJson<CacheEnvelope>(cacheKey, { fetchedAt: Date.now(), items: out, full: true });
+  await writeCacheJson<CacheEnvelope>(cacheKey, { fetchedAt: Date.now(), items: out, full: true });
   return out;
 }
 
 export async function getCachedCategory(category: CategoryId): Promise<AnimeDetail[] | null> {
   const def = getCategoryDef(category);
   if (!def) return null;
-  const cached = await readJson<CacheEnvelope | null>(def.cacheKey, null);
+  const cached = await readCacheJson<CacheEnvelope | null>(def.cacheKey, null);
   return cached ? cached.items : null;
 }
 
 export async function getCachedAnyCategory(aid: number): Promise<AnimeDetail | null> {
   for (const def of CATEGORIES) {
-    const cached = await readJson<CacheEnvelope | null>(def.cacheKey, null);
+    const cached = await readCacheJson<CacheEnvelope | null>(def.cacheKey, null);
     const found = cached?.items.find((a) => a.aid === aid);
     if (found) return found;
   }

@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Fixed
+- **`SQLiteFullException: database or disk is full`** when loading multiple categories. AsyncStorage's SQLite backing has a default limit around 6MB on Android, and 12 categories × thousands of items each (each ~900B with title, description, posterUrl, genres, alt titles) can easily blow past that. Migrated all AniList category caches off AsyncStorage to `expo-file-system` (no size limit beyond device free space). New `src/services/cache-storage.ts` exposes `readCacheJson` / `writeCacheJson` / `removeCache` plus a one-shot `migrateAsyncStorageKeys('anilist-cache-')` that runs on app start to move any existing caches from the broken SQLite backing to the new file-system backing and free the SQLite slots. Small key/value (sources, favorites, settings, background config) stays on AsyncStorage.
+
+### Changed
+- **Hentai category default-on.** The opt-in toggle in Settings → Content now defaults to enabled, matching user intent ("not a judger; let whoever search whatever"). Toggle still exists for users who want to hide the category.
+
+### Removed
+- **Removed a short-lived content filter** on the AniList query that was added during the morning's takedown-risk pass. AniList results pass through unfiltered; the README disclaimer was trimmed to match.
+- **Speculative cache key bumps** that were tied to the blocklist (top-v3, hentai-v3, etc.) reverted back to v2/v1 so existing caches survive the change.
+
 ### Changed
 - **Cache trusts itself forever.** Categories no longer hard-expire after 24 hours. Once a category is fully fetched, every subsequent visit loads from AsyncStorage instantly with zero network requests. The only way to re-fetch is to tap the ↻ button next to the search bar. Saves battery + bandwidth on phones; matches the desktop launcher's `--refresh`-only semantics. Partial caches (from interrupted fetches) still continue from where they left off on the next visit.
 

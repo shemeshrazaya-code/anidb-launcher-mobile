@@ -7,22 +7,18 @@ import {
   Animated,
   FlatList,
   Pressable,
-  ScrollView,
   StyleSheet,
   TextInput,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Brand, Colors } from '@/constants/theme';
-import { useThemeColor } from '@/hooks/use-theme-color';
-
-const SPONSOR_URL = 'https://github.com/sponsors/shemeshrazaya-code';
-
 import { CategorySheet } from '@/components/category-sheet';
 import { GenreFilterSheet } from '@/components/genre-filter-sheet';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { Brand, Colors } from '@/constants/theme';
+import { useThemeColor } from '@/hooks/use-theme-color';
 import {
   CategoryId,
   DEFAULT_CATEGORY,
@@ -32,7 +28,10 @@ import {
   getCategoryDef,
   searchAnime,
 } from '@/src/services/anilist';
+import { useAppSettings } from '@/src/services/app-settings';
 import { AnimeDetail } from '@/src/types/anime';
+
+const SPONSOR_URL = 'https://github.com/sponsors/shemeshrazaya-code';
 
 export default function BrowseScreen() {
   const insets = useSafeAreaInsets();
@@ -40,9 +39,18 @@ export default function BrowseScreen() {
   const borderColor = useThemeColor({}, 'border');
   const textColor = useThemeColor({}, 'text');
   const mutedColor = useThemeColor({}, 'muted');
+  const { settings: appSettings } = useAppSettings();
   const [category, setCategory] = useState<CategoryId>(DEFAULT_CATEGORY);
   const [categorySheetOpen, setCategorySheetOpen] = useState(false);
   const currentCategoryDef = getCategoryDef(category);
+  const currentCategoryIsAdult = !!currentCategoryDef?.adult;
+
+  // Safety: if the user disables Hentai while it's the active category, reset.
+  useEffect(() => {
+    if (!appSettings.hentaiEnabled && currentCategoryIsAdult) {
+      setCategory(DEFAULT_CATEGORY);
+    }
+  }, [appSettings.hentaiEnabled, currentCategoryIsAdult]);
   const [items, setItems] = useState<AnimeDetail[] | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -105,12 +113,12 @@ export default function BrowseScreen() {
     setSearching(true);
     const timer = setTimeout(async () => {
       try {
-        const results = await searchAnime(q, { includeAdult: !!currentCategoryDef?.adult });
+        const results = await searchAnime(q, { includeAdult: currentCategoryIsAdult });
         if (seq === searchSeq.current) {
           setSearchResults(results);
           setSearching(false);
         }
-      } catch (e) {
+      } catch {
         if (seq === searchSeq.current) {
           setSearchResults([]);
           setSearching(false);
@@ -118,7 +126,7 @@ export default function BrowseScreen() {
       }
     }, 400);
     return () => clearTimeout(timer);
-  }, [filter, category]);
+  }, [filter, currentCategoryIsAdult]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -208,6 +216,7 @@ export default function BrowseScreen() {
         selectedId={category}
         onSelect={setCategory}
         onClose={() => setCategorySheetOpen(false)}
+        showAdult={appSettings.hentaiEnabled}
       />
       <ThemedView style={styles.searchBar}>
         <TextInput

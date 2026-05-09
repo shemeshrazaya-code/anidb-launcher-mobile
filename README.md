@@ -4,6 +4,8 @@ Android port of [anidb-launcher](https://github.com/shemeshrazaya-code/anidb-lau
 
 Built with Expo SDK 54 + React Native 0.81 + TypeScript.
 
+> **About this app.** This is a metadata browser and search-URL launcher. It does **not** host, distribute, stream, or download any media. Posters and titles are loaded at runtime from the public AniList API. Search shortcuts are user-supplied URL templates — the app ships with **zero default sources** by design.
+
 ## What it does
 
 - **Browse** — top anime from AniList, posters and metadata, pull-to-refresh.

@@ -9,6 +9,7 @@ import {
   ScrollView,
   Share,
   StyleSheet,
+  Switch,
   TextInput,
   View,
 } from 'react-native';
@@ -17,8 +18,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ImportSourcesSheet } from '@/components/import-sources-sheet';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Brand } from '@/constants/theme';
+import { Brand, Colors } from '@/constants/theme';
 import { useThemeColor } from '@/hooks/use-theme-color';
+import { useAppSettings } from '@/src/services/app-settings';
 import { BACKGROUND_PRESETS, useAppBackground } from '@/src/services/background';
 import { addSource, loadSources, removeSource, saveSources } from '@/src/services/sources';
 import { mergeSources, serializeSources } from '@/src/services/sources-share';
@@ -35,6 +37,7 @@ export default function SettingsScreen() {
   const textColor = useThemeColor({}, 'text');
   const mutedColor = useThemeColor({}, 'muted');
   const { config: bgConfig, setVariant: setBgVariant, setCustomUri: setBgCustomUri, clearCustom: clearBgCustom } = useAppBackground();
+  const { settings: appSettings, setHentaiEnabled } = useAppSettings();
   const [sources, setSources] = useState<Source[]>([]);
   const [name, setName] = useState('');
   const [tmpl, setTmpl] = useState('');
@@ -279,6 +282,24 @@ export default function SettingsScreen() {
       </ThemedView>
 
       <ThemedView style={styles.section}>
+        <ThemedText type="subtitle">Content</ThemedText>
+        <View style={[styles.toggleRow, { backgroundColor: surfaceColor, borderColor }]}>
+          <View style={styles.toggleText}>
+            <ThemedText style={styles.toggleLabel}>Show Hentai category</ThemedText>
+            <ThemedText style={styles.toggleDesc}>
+              Adds (or hides) the Hentai category in the picker. Doesn&apos;t affect search or other categories.
+            </ThemedText>
+          </View>
+          <Switch
+            value={appSettings.hentaiEnabled}
+            onValueChange={setHentaiEnabled}
+            trackColor={{ false: Colors.dark.border, true: Brand.primary }}
+            thumbColor="#fff"
+          />
+        </View>
+      </ThemedView>
+
+      <ThemedView style={styles.section}>
         <ThemedText type="subtitle">About</ThemedText>
         <ThemedView style={styles.aboutRow}>
           <ThemedText style={styles.aboutLabel}>Version</ThemedText>
@@ -398,4 +419,16 @@ const styles = StyleSheet.create({
   },
   shareBtnPressed: { opacity: 0.7 },
   shareBtnText: { color: Brand.primaryLight, fontSize: 13, fontWeight: '600' },
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 12,
+  },
+  toggleText: { flex: 1, gap: 4 },
+  toggleLabel: { fontSize: 15, fontWeight: '600' },
+  toggleDesc: { fontSize: 12, opacity: 0.6, lineHeight: 16 },
 });
