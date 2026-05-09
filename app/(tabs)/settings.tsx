@@ -2,7 +2,7 @@ import Constants from 'expo-constants';
 import * as ImagePicker from 'expo-image-picker';
 import * as Linking from 'expo-linking';
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   Alert,
   Pressable,
@@ -24,7 +24,7 @@ import { useAppSettings } from '@/src/services/app-settings';
 import { BACKGROUND_PRESETS, useAppBackground } from '@/src/services/background';
 import { addSource, loadSources, removeSource, saveSources } from '@/src/services/sources';
 import { mergeSources, serializeSources } from '@/src/services/sources-share';
-import { Source, validateSource } from '@/src/types/source';
+import { normalizeSourceUrlTemplate, previewSourceUrl, Source } from '@/src/types/source';
 
 const REPO_URL = 'https://github.com/shemeshrazaya-code/anidb-launcher-mobile';
 const SPONSOR_URL = 'https://github.com/sponsors/shemeshrazaya-code';
@@ -42,6 +42,17 @@ export default function SettingsScreen() {
   const [name, setName] = useState('');
   const [tmpl, setTmpl] = useState('');
   const [importOpen, setImportOpen] = useState(false);
+
+  const templatePreview = useMemo(() => {
+    if (!tmpl.trim()) return null;
+    try {
+      const template = normalizeSourceUrlTemplate(tmpl);
+      return { template, previewUrl: previewSourceUrl(template), error: null };
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return { template: null, previewUrl: null, error: msg };
+    }
+  }, [tmpl]);
 
   const onExport = useCallback(async () => {
     if (sources.length === 0) {
@@ -107,9 +118,9 @@ export default function SettingsScreen() {
   );
 
   const onAdd = useCallback(async () => {
-    const candidate: Source = { name: name.trim(), searchUrlTemplate: tmpl.trim() };
     try {
-      validateSource(candidate);
+      const template = normalizeSourceUrlTemplate(tmpl);
+      const candidate: Source = { name: name.trim(), searchUrlTemplate: template };
       await addSource(candidate);
       setName('');
       setTmpl('');
@@ -145,7 +156,7 @@ export default function SettingsScreen() {
       <ThemedView style={styles.section}>
         <ThemedText type="subtitle">Search sources</ThemedText>
         <ThemedText style={styles.help}>
-          Bring your own search URLs. Use {'{query}'} where the title goes.
+          Paste a search results URL. Anime DB will turn the search term into {'{query}'}.
         </ThemedText>
         <View style={styles.shareRow}>
           <Pressable
@@ -196,7 +207,7 @@ export default function SettingsScreen() {
           autoCorrect={false}
         />
         <TextInput
-          placeholder="https://example.com/search?q={query}"
+          placeholder="https://example.com/search?q=naruto"
           placeholderTextColor={mutedColor}
           value={tmpl}
           onChangeText={setTmpl}
@@ -208,6 +219,24 @@ export default function SettingsScreen() {
           autoCorrect={false}
           keyboardType="url"
         />
+        {templatePreview ? (
+          <View
+            style={[
+              styles.previewBox,
+              templatePreview.error ? styles.previewBoxError : styles.previewBoxReady,
+            ]}>
+            {templatePreview.error ? (
+              <ThemedText style={styles.previewError}>{templatePreview.error}</ThemedText>
+            ) : (
+              <>
+                <ThemedText style={styles.previewLabel}>Preview</ThemedText>
+                <ThemedText style={styles.previewUrl} numberOfLines={2}>
+                  {templatePreview.previewUrl}
+                </ThemedText>
+              </>
+            )}
+          </View>
+        ) : null}
         <Pressable onPress={onAdd} style={({ pressed }) => [styles.addBtn, pressed && styles.addBtnPressed]}>
           <ThemedText type="defaultSemiBold" lightColor="#fff" darkColor="#fff">Add source</ThemedText>
         </Pressable>
@@ -362,6 +391,24 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     fontSize: 14,
   },
+  previewBox: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 4,
+  },
+  previewBoxReady: {
+    borderColor: 'rgba(139,92,246,0.45)',
+    backgroundColor: 'rgba(139,92,246,0.10)',
+  },
+  previewBoxError: {
+    borderColor: 'rgba(220,80,80,0.35)',
+    backgroundColor: 'rgba(220,80,80,0.10)',
+  },
+  previewLabel: { fontSize: 11, opacity: 0.65, textTransform: 'uppercase', letterSpacing: 0.5 },
+  previewUrl: { color: Brand.primaryLight, fontSize: 12, lineHeight: 16 },
+  previewError: { color: '#e57373', fontSize: 12, lineHeight: 16 },
   addBtn: {
     paddingVertical: 12,
     paddingHorizontal: 16,

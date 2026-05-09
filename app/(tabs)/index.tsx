@@ -1,8 +1,8 @@
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Linking from 'expo-linking';
-import { router } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   FlatList,
@@ -13,10 +13,12 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { BrandWordmark } from '@/components/brand-wordmark';
 import { CategorySheet } from '@/components/category-sheet';
 import { GenreFilterSheet } from '@/components/genre-filter-sheet';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Brand, Colors } from '@/constants/theme';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import {
@@ -29,9 +31,12 @@ import {
   searchAnime,
 } from '@/src/services/anilist';
 import { useAppSettings } from '@/src/services/app-settings';
+import { loadFavorites } from '@/src/services/favorites';
+import { loadSources } from '@/src/services/sources';
 import { AnimeDetail } from '@/src/types/anime';
 
 const SPONSOR_URL = 'https://github.com/sponsors/shemeshrazaya-code';
+const LIVE_SEARCH_MIN_CHARS = 2;
 
 export default function BrowseScreen() {
   const insets = useSafeAreaInsets();
@@ -59,9 +64,33 @@ export default function BrowseScreen() {
   const [genreSheetOpen, setGenreSheetOpen] = useState(false);
   const [searchResults, setSearchResults] = useState<AnimeDetail[] | null>(null);
   const [searching, setSearching] = useState(false);
+  const [hasSources, setHasSources] = useState(true);
+  const [favoriteIds, setFavoriteIds] = useState<Set<number>>(new Set());
+  const [starredOnly, setStarredOnly] = useState(false);
   const searchSeq = useRef(0);
   const [progress, setProgress] = useState<FetchProgress | null>(null);
   const fetchSignal = useRef<{ cancelled: boolean } | null>(null);
+  const deferredFilter = useDeferredValue(filter);
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      Promise.all([loadSources(), loadFavorites()])
+        .then(([sources, favorites]) => {
+          if (!active) return;
+          setHasSources(sources.length > 0);
+          setFavoriteIds(favorites);
+        })
+        .catch(() => {
+          if (!active) return;
+          setHasSources(true);
+          setFavoriteIds(new Set());
+        });
+      return () => {
+        active = false;
+      };
+    }, []),
+  );
 
   useEffect(() => {
     setActiveGenres(new Set());
@@ -103,8 +132,9 @@ export default function BrowseScreen() {
   }, [category]);
 
   useEffect(() => {
-    const q = filter.trim();
-    if (!q) {
+    const q = deferredFilter.trim();
+    if (q.length < LIVE_SEARCH_MIN_CHARS) {
+      searchSeq.current += 1;
       setSearchResults(null);
       setSearching(false);
       return;
@@ -126,7 +156,7 @@ export default function BrowseScreen() {
       }
     }, 400);
     return () => clearTimeout(timer);
-  }, [filter, currentCategoryIsAdult]);
+  }, [deferredFilter, currentCategoryIsAdult]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -160,6 +190,7 @@ export default function BrowseScreen() {
   }, [category]);
 
   const inSearchMode = filter.trim().length > 0;
+  const searchQuery = deferredFilter.trim();
 
   const genres = useMemo(() => {
     if (!items) return [];
@@ -172,18 +203,33 @@ export default function BrowseScreen() {
       .map(([name]) => name);
   }, [items]);
 
+  const localSearchResults = useMemo(() => {
+    if (!items || !searchQuery) return [];
+    return items.filter((item) => matchesLocalSearch(item, searchQuery));
+  }, [items, searchQuery]);
+
   const visible = useMemo(() => {
-    if (inSearchMode) return searchResults ?? [];
-    if (!items) return [];
-    if (activeGenres.size === 0) return items;
-    return items.filter((a) => {
-      const itemGenres = a.genres ?? [];
-      for (const g of itemGenres) {
-        if (activeGenres.has(g)) return true;
-      }
-      return false;
-    });
-  }, [items, searchResults, inSearchMode, activeGenres]);
+    let filtered: AnimeDetail[];
+    if (inSearchMode) {
+      filtered = mergeSearchResults(localSearchResults, searchResults ?? []);
+    } else if (!items) {
+      filtered = [];
+    } else if (activeGenres.size === 0) {
+      filtered = items;
+    } else {
+      filtered = items.filter((a) => {
+        const itemGenres = a.genres ?? [];
+        for (const g of itemGenres) {
+          if (activeGenres.has(g)) return true;
+        }
+        return false;
+      });
+    }
+    if (!starredOnly) return filtered;
+    return filtered.filter((a) => favoriteIds.has(a.aid));
+  }, [items, searchResults, inSearchMode, activeGenres, localSearchResults, starredOnly, favoriteIds]);
+
+  const statusFilterText = statusFilterLabel(activeGenres, starredOnly);
 
   if (items == null && !error && !inSearchMode) {
     return <SkeletonBrowse label={currentCategoryDef?.name ?? category} />;
@@ -192,7 +238,7 @@ export default function BrowseScreen() {
   return (
     <ThemedView style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.appHeader}>
-        <ThemedText style={styles.appTitle}>Anime DB</ThemedText>
+        <BrandWordmark style={styles.wordmark} />
       </View>
       <View style={styles.categoryButtonRow}>
         <Pressable
@@ -250,8 +296,8 @@ export default function BrowseScreen() {
           </ThemedText>
         </Pressable>
       </ThemedView>
-      {!inSearchMode && (
-        <View style={styles.genreButtonRow}>
+      <View style={styles.filterButtonRow}>
+        {!inSearchMode ? (
           <Pressable
             onPress={() => setGenreSheetOpen(true)}
             style={({ pressed }) => [
@@ -287,8 +333,32 @@ export default function BrowseScreen() {
               <ThemedText style={styles.genreButtonChevron}>▾</ThemedText>
             )}
           </Pressable>
-        </View>
-      )}
+        ) : null}
+        <Pressable
+          accessibilityLabel={starredOnly ? 'Show all anime' : 'Show only starred anime'}
+          accessibilityRole="button"
+          accessibilityState={{ selected: starredOnly }}
+          onPress={() => setStarredOnly((current) => !current)}
+          style={({ pressed }) => [
+            styles.starFilterButton,
+            inSearchMode && styles.starFilterButtonWide,
+            { backgroundColor: surfaceColor, borderColor },
+            starredOnly && styles.starFilterButtonActive,
+            pressed && styles.starFilterButtonPressed,
+          ]}>
+          <IconSymbol
+            size={18}
+            name="star.fill"
+            color={starredOnly ? '#fbbf24' : mutedColor}
+          />
+          <ThemedText style={[styles.starFilterText, starredOnly && styles.starFilterTextActive]}>
+            Starred
+          </ThemedText>
+          {favoriteIds.size > 0 ? (
+            <ThemedText style={styles.starFilterCount}>{favoriteIds.size}</ThemedText>
+          ) : null}
+        </Pressable>
+      </View>
       <GenreFilterSheet
         visible={genreSheetOpen}
         available={genres}
@@ -309,9 +379,7 @@ export default function BrowseScreen() {
         <View style={styles.progressTrackEmpty} />
       )}
       <ThemedView style={styles.statusRow}>
-        {searching ? (
-          <ThemedText style={styles.resultCount}>Searching…</ThemedText>
-        ) : progress && !inSearchMode ? (
+        {progress && !inSearchMode ? (
           <ThemedText style={styles.resultCount}>
             Loading {progress.phase} · {progress.itemCount} entries
           </ThemedText>
@@ -319,12 +387,10 @@ export default function BrowseScreen() {
           <ThemedText style={styles.resultCount}>
             {visible.length} {visible.length === 1 ? 'result' : 'results'}
             {inSearchMode
-              ? ` for "${filter.trim()}"`
-              : activeGenres.size === 1
-                ? ` · ${Array.from(activeGenres)[0]}`
-                : activeGenres.size > 1
-                  ? ` · ${activeGenres.size} genres`
-                  : ''}
+              ? ` for "${filter.trim()}"${searching ? ' · checking AniList' : ''}${
+                  starredOnly ? ' · starred' : ''
+                }`
+              : statusFilterText}
           </ThemedText>
         )}
       </ThemedView>
@@ -333,17 +399,20 @@ export default function BrowseScreen() {
           <ThemedText style={styles.errorText}>{error} — tap to retry</ThemedText>
         </Pressable>
       ) : null}
+      {hasSources === false && !inSearchMode ? <SourceSetupPrompt /> : null}
       <FlatList
         data={visible}
         keyExtractor={(item) => String(item.aid)}
         contentContainerStyle={styles.listContent}
         columnWrapperStyle={styles.gridRow}
         numColumns={2}
-        renderItem={({ item }) => <AnimeCard item={item} />}
+        renderItem={({ item }) => <AnimeCard item={item} isFavorite={favoriteIds.has(item.aid)} />}
         ListEmptyComponent={
           searching ? null : (
             <ThemedView style={styles.empty}>
-              <ThemedText style={styles.note}>No matches.</ThemedText>
+              <ThemedText style={styles.note}>
+                {starredOnly ? 'No starred matches.' : 'No matches.'}
+              </ThemedText>
             </ThemedView>
           )
         }
@@ -364,6 +433,56 @@ export default function BrowseScreen() {
   );
 }
 
+function statusFilterLabel(activeGenres: Set<string>, starredOnly: boolean): string {
+  const parts: string[] = [];
+  if (starredOnly) parts.push('starred');
+  if (activeGenres.size === 1) {
+    parts.push(Array.from(activeGenres)[0]);
+  } else if (activeGenres.size > 1) {
+    parts.push(`${activeGenres.size} genres`);
+  }
+  return parts.length > 0 ? ` · ${parts.join(' · ')}` : '';
+}
+
+function matchesLocalSearch(item: AnimeDetail, query: string): boolean {
+  const needle = query.toLowerCase();
+  const haystack = [
+    item.title,
+    item.season,
+    item.type,
+    ...(item.altTitles ?? []),
+    ...(item.genres ?? []),
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+  return haystack.includes(needle);
+}
+
+function mergeSearchResults(local: AnimeDetail[], live: AnimeDetail[]): AnimeDetail[] {
+  const seen = new Set<number>();
+  const out: AnimeDetail[] = [];
+  for (const item of [...local, ...live]) {
+    if (seen.has(item.aid)) continue;
+    seen.add(item.aid);
+    out.push(item);
+  }
+  return out;
+}
+
+function SourceSetupPrompt() {
+  return (
+    <Pressable
+      onPress={() => router.push('/settings')}
+      style={({ pressed }) => [styles.sourceSetupPrompt, pressed && styles.sourceSetupPromptPressed]}>
+      <ThemedText style={styles.sourceSetupTitle}>Add your first search source</ThemedText>
+      <ThemedText style={styles.sourceSetupText}>
+        Paste a search results URL in Settings; Anime DB will turn it into a reusable source.
+      </ThemedText>
+    </Pressable>
+  );
+}
+
 function yearOf(item: AnimeDetail): string | null {
   if (item.startDate) {
     const m = item.startDate.match(/^(\d{4})/);
@@ -376,7 +495,7 @@ function yearOf(item: AnimeDetail): string | null {
   return null;
 }
 
-function AnimeCard({ item }: { item: AnimeDetail }) {
+function AnimeCard({ item, isFavorite }: { item: AnimeDetail; isFavorite: boolean }) {
   const year = yearOf(item);
   return (
     <Pressable
@@ -394,6 +513,11 @@ function AnimeCard({ item }: { item: AnimeDetail }) {
           style={styles.posterGradient}
           pointerEvents="none"
         />
+        {isFavorite ? (
+          <View style={styles.favoriteCardBadge}>
+            <IconSymbol size={15} name="star.fill" color="#fbbf24" />
+          </View>
+        ) : null}
         {item.rating != null && (
           <View style={styles.ratingBadge}>
             <ThemedText style={styles.ratingBadgeText}>★ {item.rating.toFixed(1)}</ThemedText>
@@ -460,14 +584,10 @@ const styles = StyleSheet.create({
   note: { opacity: 0.7 },
   appHeader: {
     paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 4,
+    paddingTop: 8,
+    paddingBottom: 0,
   },
-  appTitle: {
-    fontSize: 26,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
+  wordmark: { width: 184, height: 44 },
   categoryButtonRow: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 4 },
   categoryButton: {
     flexDirection: 'row',
@@ -504,10 +624,11 @@ const styles = StyleSheet.create({
   refreshBtnDisabled: { opacity: 0.4 },
   refreshBtnText: { fontSize: 18, fontWeight: '600' },
   refreshBtnTextActive: { color: Brand.primaryLight },
-  genreButtonRow: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 },
+  filterButtonRow: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4, flexDirection: 'row', gap: 8 },
   genreButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
     paddingHorizontal: 14,
     paddingVertical: 9,
     borderRadius: 10,
@@ -529,6 +650,38 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.10)',
   },
   genreClearInlineText: { fontSize: 16, lineHeight: 18, fontWeight: '700' },
+  starFilterButton: {
+    alignItems: 'center',
+    borderRadius: 10,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 7,
+    justifyContent: 'center',
+    minHeight: 40,
+    minWidth: 112,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  starFilterButtonWide: { flex: 1 },
+  starFilterButtonActive: {
+    backgroundColor: 'rgba(251,191,36,0.12)',
+    borderColor: 'rgba(251,191,36,0.48)',
+  },
+  starFilterButtonPressed: { opacity: 0.78 },
+  starFilterText: { fontSize: 13, fontWeight: '700', opacity: 0.72 },
+  starFilterTextActive: { color: '#fbbf24', opacity: 1 },
+  starFilterCount: {
+    minWidth: 20,
+    overflow: 'hidden',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.11)',
+    color: Colors.dark.text,
+    fontSize: 11,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
   progressTrack: {
     height: 2,
     marginHorizontal: 12,
@@ -543,6 +696,20 @@ const styles = StyleSheet.create({
   resultCount: { fontSize: 12, opacity: 0.55 },
   errorBanner: { marginHorizontal: 12, padding: 10, borderRadius: 8, backgroundColor: 'rgba(220,80,80,0.15)' },
   errorText: { color: '#e57373', fontSize: 13 },
+  sourceSetupPrompt: {
+    marginHorizontal: 12,
+    marginBottom: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(139,92,246,0.45)',
+    backgroundColor: 'rgba(139,92,246,0.12)',
+    gap: 3,
+  },
+  sourceSetupPromptPressed: { opacity: 0.75 },
+  sourceSetupTitle: { color: Brand.primaryLight, fontWeight: '800', fontSize: 14 },
+  sourceSetupText: { fontSize: 12, opacity: 0.72, lineHeight: 16 },
   listContent: { paddingHorizontal: 8, paddingBottom: 16 },
   gridRow: { gap: 8, paddingHorizontal: 4 },
   card: { flex: 1, marginBottom: 12 },
@@ -559,6 +726,19 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 4,
     backgroundColor: 'rgba(0,0,0,0.7)',
+  },
+  favoriteCardBadge: {
+    position: 'absolute',
+    top: 6,
+    left: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(251,191,36,0.42)',
+    backgroundColor: 'rgba(0,0,0,0.72)',
   },
   ratingBadgeText: { color: '#fff', fontSize: 11, fontWeight: '600' },
   cardOverlay: { position: 'absolute', left: 8, right: 8, bottom: 8 },

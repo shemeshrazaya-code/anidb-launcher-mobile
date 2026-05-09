@@ -43,7 +43,36 @@ export function AppBackground() {
     );
   }
 
+  if (config.variant === 'aurora') {
+    return <AuroraBackground />;
+  }
+
   return <SnakeSkin />;
+}
+
+function AuroraBackground() {
+  return (
+    <View style={styles.bg} pointerEvents="none">
+      <LinearGradient
+        colors={['#071314', '#0d1015', '#101014']}
+        locations={[0, 0.52, 1]}
+        style={StyleSheet.absoluteFill}
+      />
+      <LinearGradient
+        colors={['rgba(45,212,191,0.22)', 'rgba(18,24,32,0.08)', 'transparent']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+      <LinearGradient
+        colors={['transparent', 'rgba(139,92,246,0.15)', 'rgba(8,10,12,0.25)']}
+        start={{ x: 0.15, y: 0 }}
+        end={{ x: 0.85, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+      <View style={[StyleSheet.absoluteFill, styles.softNoise]} />
+    </View>
+  );
 }
 
 function SnakeSkin() {
@@ -107,4 +136,5 @@ const styles = StyleSheet.create({
     bottom: 0,
   },
   customOverlay: { backgroundColor: 'rgba(0,0,0,0.4)' },
+  softNoise: { backgroundColor: 'rgba(255,255,255,0.015)' },
 });

@@ -1,6 +1,6 @@
 # anidb-launcher-mobile
 
-Android port of [anidb-launcher](https://github.com/shemeshrazaya-code/anidb-launcher) — browse top anime, then launch a search on any user-configured site in your default browser.
+Android port of [anidb-launcher](https://github.com/shemeshrazaya-code/anidb-launcher) — browse anime from AniList, then launch a search on any user-configured site in your default browser.
 
 Built with Expo SDK 54 + React Native 0.81 + TypeScript.
 
@@ -8,10 +8,10 @@ Built with Expo SDK 54 + React Native 0.81 + TypeScript.
 
 ## What it does
 
-- **Browse** — top anime from AniList, posters and metadata, pull-to-refresh.
+- **Browse** — AniList categories, posters, metadata, local-first search, genre filtering, and a Starred-only filter.
 - **Detail** — synopsis, genres, alt titles, "Search on…" action.
 - **Favorites** — tap "Add to favorites" on any anime, view the list anytime.
-- **Settings** — bring your own search URLs. Configure as many sources as you want.
+- **Settings** — bring your own search URLs, share/import sources, and choose the app background.
 
 The app's core action: pick an anime, pick a source, and the app fires off `https://your-source.example/search?q={title}` in your browser. Sources are user-supplied — the app ships with zero defaults by design.
 
@@ -22,8 +22,9 @@ Grab the APK from the [latest release](https://github.com/shemeshrazaya-code/ani
 ## First-run setup
 
 1. Open the **Settings** tab.
-2. Add a source: a name (e.g. `MyAnimeList`) and a URL template containing `{query}` where the title goes (e.g. `https://myanimelist.net/anime.php?q={query}`).
-3. Open any anime from Browse — your sources appear under "Search on…".
+2. Add a source name, then paste a normal search results URL such as `https://myanimelist.net/anime.php?q=naruto`.
+3. Anime DB turns the searched term into `{query}` and shows a preview before saving.
+4. Open any anime from Browse — your sources appear under "Search on…".
 
 ## Build from source
 
@@ -56,10 +57,10 @@ Storage layer (sources, favorites, URL templating) is covered by jest. UI is ver
 
 ## Roadmap
 
-v0.1.0 ships the core launcher loop. Planned for later:
+Planned for later:
 
 - Reminders ("watch later" with optional notification)
-- First-run setup wizard for sources
+- Curated source presets/import packs
 - iOS build (TestFlight or Appetize)
 - Source-availability check (probe a URL pattern before launching)
 

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { readJson, writeJson } from './storage';
 
-export type BackgroundVariant = 'snake-skin' | 'solid' | 'gradient' | 'custom';
+export type BackgroundVariant = 'aurora' | 'snake-skin' | 'solid' | 'gradient' | 'custom';
 
 export interface BackgroundConfig {
   variant: BackgroundVariant;
@@ -16,13 +16,14 @@ export interface BackgroundPreset {
 }
 
 export const BACKGROUND_PRESETS: BackgroundPreset[] = [
-  { variant: 'snake-skin', name: 'Snake skin', description: 'Subtle violet-tinted scale pattern' },
-  { variant: 'gradient', name: 'Violet fade', description: 'Top-down gradient, dark violet to near-black' },
+  { variant: 'aurora', name: 'Midnight aurora', description: 'Calm teal and violet depth' },
   { variant: 'solid', name: 'Solid dark', description: 'Plain near-black, distraction-free' },
+  { variant: 'gradient', name: 'Violet fade', description: 'Top-down gradient, dark violet to near-black' },
+  { variant: 'snake-skin', name: 'Snake skin', description: 'Subtle violet-tinted scale pattern' },
 ];
 
 const STORAGE_KEY = 'app-background-v1';
-const DEFAULT_CONFIG: BackgroundConfig = { variant: 'snake-skin' };
+const DEFAULT_CONFIG: BackgroundConfig = { variant: 'aurora' };
 
 export async function loadBackground(): Promise<BackgroundConfig> {
   const stored = await readJson<BackgroundConfig | null>(STORAGE_KEY, null);
@@ -89,7 +90,7 @@ export function useAppBackground(): {
   );
 
   const clearCustom = useCallback(async () => {
-    const next: BackgroundConfig = { variant: 'snake-skin', customUri: null };
+    const next: BackgroundConfig = { variant: 'aurora', customUri: null };
     await saveBackground(next);
     setConfig(next);
     notify(next);

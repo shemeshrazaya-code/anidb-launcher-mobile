@@ -1,5 +1,7 @@
 import {
   buildSourceUrl,
+  normalizeSourceUrlTemplate,
+  previewSourceUrl,
   QUERY_PLACEHOLDER,
   Source,
   SourceError,
@@ -49,5 +51,47 @@ describe('source URL building', () => {
     expect(() =>
       validateSource({ name: '   ', searchUrlTemplate: 'https://x/{query}' }),
     ).toThrow(/non-empty/);
+  });
+
+  it('normalizes templates without a scheme', () => {
+    expect(normalizeSourceUrlTemplate('example.com/search?q={query}')).toBe(
+      'https://example.com/search?q={query}',
+    );
+  });
+
+  it('infers the placeholder from a pasted search URL query parameter', () => {
+    expect(normalizeSourceUrlTemplate('https://example.com/search?q=naruto&page=1')).toBe(
+      'https://example.com/search?q={query}&page=1',
+    );
+  });
+
+  it('infers the placeholder from common non-q search parameters', () => {
+    expect(normalizeSourceUrlTemplate('anime.example/find?keyword=naruto')).toBe(
+      'https://anime.example/find?keyword={query}',
+    );
+  });
+
+  it('falls back to the last populated query parameter', () => {
+    expect(normalizeSourceUrlTemplate('example.com/search?category=anime&name=naruto')).toBe(
+      'https://example.com/search?category=anime&name={query}',
+    );
+  });
+
+  it('infers the placeholder from the last path segment when no query parameter exists', () => {
+    expect(normalizeSourceUrlTemplate('https://example.com/search/naruto')).toBe(
+      'https://example.com/search/{query}',
+    );
+  });
+
+  it('rejects non-web schemes', () => {
+    expect(() => normalizeSourceUrlTemplate('javascript://example.com/search?q={query}'))
+      .toThrow(/http/);
+  });
+
+  it('builds a preview URL for the normalized template', () => {
+    const template = normalizeSourceUrlTemplate('example.com/search?q=naruto');
+    expect(previewSourceUrl(template)).toBe(
+      'https://example.com/search?q=Attack%20on%20Titan',
+    );
   });
 });
