@@ -1,6 +1,6 @@
 # anidb-launcher-mobile
 
-Android port of [anidb-launcher](https://github.com/shemeshrazaya-code/anidb-launcher) — browse anime from AniList, then launch a search on any user-configured site in your default browser.
+Android port of [anidb-launcher](https://github.com/shemeshrazaya-code/anidb-launcher) — browse anime from AniList, then launch a search on any user-configured site in a bundled shielded browser.
 
 Built with Expo SDK 54 + React Native 0.81 + TypeScript.
 
@@ -13,11 +13,17 @@ Built with Expo SDK 54 + React Native 0.81 + TypeScript.
 - **Favorites** — tap "Add to favorites" on any anime, view the list anytime.
 - **Settings** — bring your own search URLs, share/import sources, and choose the app background.
 
-The app's core action: pick an anime, pick a source, and the app fires off `https://your-source.example/search?q={title}` in your browser. Sources are user-supplied — the app ships with zero defaults by design.
+The app's core action: pick an anime, pick a source, and the app opens `https://your-source.example/search?q={title}` in an in-app GeckoView browser with bundled uBlock Origin. Sources are user-supplied — the app ships with zero defaults by design.
+
+## Shielded browser
+
+On Android, source launches open in a mini browser built on Mozilla GeckoView. The APK bundles uBlock Origin 1.70.0 as a built-in extension, so sideloaded installs do not need Firefox, DNS setup, or extension setup first. Non-Android builds fall back to the platform browser.
+
+See [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md) for bundled uBlock Origin license/source details.
 
 ## Install (sideload)
 
-Grab the APK from the [latest release](https://github.com/shemeshrazaya-code/anidb-launcher-mobile/releases/latest), allow installs from unknown sources, install. Android 7.0+ (API 24+).
+Grab the APK from the [latest release](https://github.com/shemeshrazaya-code/anidb-launcher-mobile/releases/latest), allow installs from unknown sources, install. Android 8.0+ (API 26+).
 
 ## First-run setup
 
