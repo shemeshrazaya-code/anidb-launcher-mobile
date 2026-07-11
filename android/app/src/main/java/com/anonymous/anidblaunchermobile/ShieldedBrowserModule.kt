@@ -1,6 +1,7 @@
 package com.anonymous.anidblaunchermobile
 
 import android.content.Intent
+import android.net.Uri
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
@@ -13,8 +14,11 @@ class ShieldedBrowserModule(
 
   @ReactMethod
   fun openUrl(url: String, promise: Promise) {
-    if (!url.startsWith("https://") && !url.startsWith("http://")) {
-      promise.reject("E_BAD_URL", "Shielded browser only opens http and https URLs.")
+    val parsed = runCatching { Uri.parse(url) }.getOrNull()
+    val scheme = parsed?.scheme?.lowercase()
+    val host = parsed?.host
+    if (parsed == null || (scheme != "http" && scheme != "https") || host.isNullOrBlank()) {
+      promise.reject("E_BAD_URL", "Shielded browser only opens http and https URLs with a host.")
       return
     }
 

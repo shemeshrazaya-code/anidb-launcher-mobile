@@ -6,10 +6,15 @@ import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
 import android.view.Gravity
+import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import org.mozilla.geckoview.AllowOrDeny
 import org.mozilla.geckoview.GeckoResult
 import org.mozilla.geckoview.GeckoRuntime
@@ -19,6 +24,10 @@ import org.mozilla.geckoview.GeckoView
 class ShieldedBrowserActivity : Activity() {
   private var geckoSession: GeckoSession? = null
   private var canGoBack = false
+  private var fullScreenActive = false
+  private var ublockInstalled = false
+  private lateinit var root: LinearLayout
+  private lateinit var toolbar: LinearLayout
   private lateinit var backButton: TextView
   private lateinit var urlLabel: TextView
 
@@ -31,7 +40,11 @@ class ShieldedBrowserActivity : Activity() {
       return
     }
 
-    val root = LinearLayout(this).apply {
+    // Render edge-to-edge so we control insets ourselves. On targetSdk 35+ this is
+    // already enforced; calling it explicitly keeps behavior consistent on older OS.
+    WindowCompat.setDecorFitsSystemWindows(window, false)
+
+    root = LinearLayout(this).apply {
       orientation = LinearLayout.VERTICAL
       setBackgroundColor(Color.rgb(14, 15, 16))
       layoutParams = LinearLayout.LayoutParams(
@@ -40,7 +53,7 @@ class ShieldedBrowserActivity : Activity() {
       )
     }
 
-    val toolbar = LinearLayout(this).apply {
+    toolbar = LinearLayout(this).apply {
       orientation = LinearLayout.HORIZONTAL
       gravity = Gravity.CENTER_VERTICAL
       setPadding(dp(10), dp(8), dp(10), dp(8))
@@ -101,8 +114,26 @@ class ShieldedBrowserActivity : Activity() {
     root.addView(geckoView)
     setContentView(root)
 
+    // Pad the root by system bars + display cutout so the toolbar sits below the
+    // status bar and the GeckoView's bottom edge (where HTML5 video controls and
+    // subtitles render) stays above the navigation bar. Fullscreen video clears
+    // this padding via enterFullScreen().
+    ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
+      val bars = insets.getInsets(
+        WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout(),
+      )
+      if (!fullScreenActive) {
+        view.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+      }
+      insets
+    }
+
     val session = GeckoSession().also { geckoSession = it }
-    session.setContentDelegate(object : GeckoSession.ContentDelegate {})
+    session.setContentDelegate(object : GeckoSession.ContentDelegate {
+      override fun onFullScreen(session: GeckoSession, fullScreen: Boolean) {
+        if (fullScreen) enterFullScreen() else exitFullScreen()
+      }
+    })
     session.setNavigationDelegate(object : GeckoSession.NavigationDelegate {
       override fun onCanGoBack(session: GeckoSession, canGoBack: Boolean) {
         this@ShieldedBrowserActivity.canGoBack = canGoBack
@@ -116,7 +147,7 @@ class ShieldedBrowserActivity : Activity() {
         perms: MutableList<GeckoSession.PermissionDelegate.ContentPermission>,
         hasUserGesture: Boolean,
       ) {
-        urlLabel.text = url?.let { hostLabel(it) } ?: "Shielded browser"
+        urlLabel.text = decorateHost(url?.let { hostLabel(it) } ?: "Shielded browser")
       }
 
       override fun onLoadRequest(
@@ -152,11 +183,39 @@ class ShieldedBrowserActivity : Activity() {
 
   @Deprecated("Deprecated in Java")
   override fun onBackPressed() {
+    if (fullScreenActive) {
+      geckoSession?.exitFullScreen()
+      return
+    }
     if (canGoBack) {
       geckoSession?.goBack()
       return
     }
     super.onBackPressed()
+  }
+
+  private fun enterFullScreen() {
+    fullScreenActive = true
+    toolbar.visibility = View.GONE
+    root.setPadding(0, 0, 0, 0)
+
+    val controller = WindowInsetsControllerCompat(window, window.decorView)
+    controller.systemBarsBehavior =
+      WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+    controller.hide(WindowInsetsCompat.Type.systemBars())
+
+    // Orientation is driven by the device (manifest: fullSensor) and the
+    // GeckoView Screen Orientation API. We don't force it here.
+  }
+
+  private fun exitFullScreen() {
+    fullScreenActive = false
+    toolbar.visibility = View.VISIBLE
+
+    val controller = WindowInsetsControllerCompat(window, window.decorView)
+    controller.show(WindowInsetsCompat.Type.systemBars())
+
+    ViewCompat.requestApplyInsets(root)
   }
 
   private fun installUblockThenLoad(
@@ -167,8 +226,14 @@ class ShieldedBrowserActivity : Activity() {
     runtime.webExtensionController
       .ensureBuiltIn(UBLOCK_ASSET_URI, UBLOCK_EXTENSION_ID)
       .accept(
-        { session.loadUri(url) },
+        {
+          ublockInstalled = true
+          urlLabel.text = decorateHost(hostLabel(url))
+          session.loadUri(url)
+        },
         { error ->
+          ublockInstalled = false
+          urlLabel.text = decorateHost(hostLabel(url))
           Toast.makeText(
             this,
             "uBlock could not start; opening anyway.",
@@ -211,6 +276,9 @@ class ShieldedBrowserActivity : Activity() {
       Uri.parse(url).host?.removePrefix("www.") ?: "Shielded browser"
     }.getOrDefault("Shielded browser")
   }
+
+  private fun decorateHost(host: String): String =
+    if (ublockInstalled) host else "⚠ $host"
 
   private fun dp(value: Int): Int {
     return (value * resources.displayMetrics.density).toInt()
