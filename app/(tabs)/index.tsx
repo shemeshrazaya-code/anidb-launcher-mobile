@@ -26,6 +26,7 @@ import {
   DEFAULT_CATEGORY,
   FetchProgress,
   getCachedCategory,
+  getCachedCategoryMeta,
   getCategory,
   getCategoryDef,
   searchAnime,
@@ -68,6 +69,7 @@ export default function BrowseScreen() {
   const [favoriteIds, setFavoriteIds] = useState<Set<number>>(new Set());
   const [starredOnly, setStarredOnly] = useState(false);
   const searchSeq = useRef(0);
+  const [lastUpdated, setLastUpdated] = useState<number | null>(null);
   const [progress, setProgress] = useState<FetchProgress | null>(null);
   const fetchSignal = useRef<{ cancelled: boolean } | null>(null);
   const deferredFilter = useDeferredValue(filter);
@@ -97,14 +99,19 @@ export default function BrowseScreen() {
     setItems(null);
     setError(null);
     setProgress(null);
+    setLastUpdated(null);
     if (fetchSignal.current) fetchSignal.current.cancelled = true;
     const signal = { cancelled: false };
     fetchSignal.current = signal;
 
     (async () => {
-      const cached = await getCachedCategory(category);
+      const [cached, meta] = await Promise.all([
+        getCachedCategory(category),
+        getCachedCategoryMeta(category),
+      ]);
       if (signal.cancelled) return;
       if (cached && cached.length > 0) setItems(cached);
+      if (meta) setLastUpdated(meta.fetchedAt);
 
       try {
         const fresh = await getCategory(category, {
@@ -118,6 +125,8 @@ export default function BrowseScreen() {
         if (signal.cancelled) return;
         setItems(fresh);
         setProgress(null);
+        const freshMeta = await getCachedCategoryMeta(category);
+        if (!signal.cancelled && freshMeta) setLastUpdated(freshMeta.fetchedAt);
       } catch (e: unknown) {
         if (signal.cancelled) return;
         const msg = e instanceof Error ? e.message : String(e);
@@ -177,6 +186,7 @@ export default function BrowseScreen() {
       if (!signal.cancelled) {
         setItems(fresh);
         setProgress(null);
+        setLastUpdated(Date.now());
       }
     } catch (e) {
       if (!signal.cancelled) {
@@ -397,7 +407,7 @@ export default function BrowseScreen() {
               ? ` for "${filter.trim()}"${searching ? ' · checking AniList' : ''}${
                   starredOnly ? ' · starred' : ''
                 }`
-              : statusFilterText}
+              : `${statusFilterText}${lastUpdated != null ? ` · updated ${relativeAge(lastUpdated)}` : ''}`}
           </ThemedText>
         )}
       </ThemedView>
@@ -441,6 +451,15 @@ export default function BrowseScreen() {
       />
     </ThemedView>
   );
+}
+
+function relativeAge(ts: number): string {
+  const mins = Math.floor((Date.now() - ts) / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 48) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
 }
 
 function statusFilterLabel(activeGenres: Set<string>, starredOnly: boolean): string {
