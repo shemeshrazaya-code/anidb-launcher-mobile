@@ -1,37 +1,67 @@
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Brand } from '@/constants/theme';
-import { getCachedAnyCategory } from '@/src/services/anilist';
-import { toggleFavorite, loadFavorites } from '@/src/services/favorites';
+import { getAnimeById, getCachedAnyCategory } from '@/src/services/anilist';
+import { loadFavorites, recordFavoriteSnapshot, toggleFavorite } from '@/src/services/favorites';
 import { launch } from '@/src/services/launcher';
 import { loadSources } from '@/src/services/sources';
 import { AnimeDetail } from '@/src/types/anime';
 import { Source } from '@/src/types/source';
 
 export default function AnimeDetailScreen() {
-  const { aid: aidParam } = useLocalSearchParams<{ aid: string }>();
+  const { aid: aidParam, item: itemParam } = useLocalSearchParams<{ aid: string; item?: string }>();
   const aid = Number(aidParam);
   const [anime, setAnime] = useState<AnimeDetail | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [sources, setSources] = useState<Source[]>([]);
   const [isFavorite, setIsFavorite] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
+    setLoadFailed(false);
     (async () => {
-      const [found, srcs, favs] = await Promise.all([
-        getCachedAnyCategory(aid),
-        loadSources(),
-        loadFavorites(),
-      ]);
-      setAnime(found);
+      const [srcs, favs] = await Promise.all([loadSources(), loadFavorites()]);
+      if (cancelled) return;
       setSources(srcs);
       setIsFavorite(favs.has(aid));
+
+      // Fastest path: the opening screen passed the item along. Fall back to
+      // the category caches, then to a by-id AniList fetch (live-search
+      // results are often in no cache at all).
+      let found: AnimeDetail | null = null;
+      if (itemParam) {
+        try {
+          const parsed = JSON.parse(itemParam) as AnimeDetail;
+          if (parsed && parsed.aid === aid) found = parsed;
+        } catch {
+          // fall through to cache/network
+        }
+      }
+      if (!found) found = await getCachedAnyCategory(aid);
+      if (!found) {
+        try {
+          found = await getAnimeById(aid);
+        } catch {
+          // offline or AniList error — surface the not-found state
+        }
+      }
+      if (cancelled) return;
+      if (found) {
+        setAnime(found);
+        if (favs.has(aid)) recordFavoriteSnapshot(found).catch(() => {});
+      } else {
+        setLoadFailed(true);
+      }
     })();
-  }, [aid]);
+    return () => {
+      cancelled = true;
+    };
+  }, [aid, itemParam]);
 
   const onLaunch = useCallback(
     async (source: Source) => {
@@ -47,17 +77,25 @@ export default function AnimeDetailScreen() {
   );
 
   const onToggleFavorite = useCallback(async () => {
-    const next = await toggleFavorite(aid);
+    if (!anime) return;
+    const next = await toggleFavorite(anime);
     setIsFavorite(next);
-  }, [aid]);
+  }, [anime]);
 
   if (!anime) {
     return (
       <ThemedView style={styles.center}>
-        <ThemedText type="subtitle">Anime not found in cache</ThemedText>
-        <ThemedText style={styles.note}>
-          Pull-to-refresh on Browse to repopulate.
-        </ThemedText>
+        {loadFailed ? (
+          <>
+            <ThemedText type="subtitle">Anime not found</ThemedText>
+            <ThemedText style={styles.note}>
+              Not in the local cache and AniList didn&apos;t return it. Check your connection and
+              try again.
+            </ThemedText>
+          </>
+        ) : (
+          <ActivityIndicator color={Brand.primary} size="large" />
+        )}
       </ThemedView>
     );
   }

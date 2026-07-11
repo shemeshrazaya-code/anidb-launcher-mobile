@@ -16,6 +16,21 @@ import * as FileSystem from 'expo-file-system/legacy';
 
 const CACHE_DIR = `${FileSystem.documentDirectory}cache/`;
 
+// Parsed-JSON memo so back-to-back reads of the same multi-MB cache file
+// (category open reads it twice; switching back to a recent category) parse
+// once. Small cap because a full category envelope can be several MB.
+const MEMO_MAX = 3;
+const memo = new Map<string, unknown>();
+
+function memoSet(key: string, value: unknown): void {
+  memo.delete(key);
+  memo.set(key, value);
+  if (memo.size > MEMO_MAX) {
+    const oldest = memo.keys().next().value;
+    if (oldest !== undefined) memo.delete(oldest);
+  }
+}
+
 async function ensureDir(): Promise<void> {
   const info = await FileSystem.getInfoAsync(CACHE_DIR);
   if (!info.exists) {
@@ -31,24 +46,35 @@ function uriFor(key: string): string {
 }
 
 export async function readCacheJson<T>(key: string, fallback: T): Promise<T> {
+  if (memo.has(key)) {
+    const value = memo.get(key) as T;
+    memoSet(key, value);
+    return value;
+  }
   try {
     const uri = uriFor(key);
     const info = await FileSystem.getInfoAsync(uri);
     if (!info.exists) return fallback;
     const raw = await FileSystem.readAsStringAsync(uri);
-    return JSON.parse(raw) as T;
+    const parsed = JSON.parse(raw) as T;
+    memoSet(key, parsed);
+    return parsed;
   } catch {
     return fallback;
   }
 }
 
 export async function writeCacheJson<T>(key: string, value: T): Promise<void> {
+  // Invalidate rather than memoize the written value: callers may keep
+  // mutating the object they passed in (partial-fetch envelopes do).
+  memo.delete(key);
   await ensureDir();
   const uri = uriFor(key);
   await FileSystem.writeAsStringAsync(uri, JSON.stringify(value));
 }
 
 export async function removeCache(key: string): Promise<void> {
+  memo.delete(key);
   try {
     const uri = uriFor(key);
     await FileSystem.deleteAsync(uri, { idempotent: true });

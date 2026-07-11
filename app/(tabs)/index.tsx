@@ -2,7 +2,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Linking from 'expo-linking';
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   FlatList,
@@ -231,6 +231,13 @@ export default function BrowseScreen() {
 
   const statusFilterText = statusFilterLabel(activeGenres, starredOnly);
 
+  const renderItem = useCallback(
+    ({ item }: { item: AnimeDetail }) => (
+      <AnimeCard item={item} isFavorite={favoriteIds.has(item.aid)} />
+    ),
+    [favoriteIds],
+  );
+
   if (items == null && !error && !inSearchMode) {
     return <SkeletonBrowse label={currentCategoryDef?.name ?? category} />;
   }
@@ -406,7 +413,10 @@ export default function BrowseScreen() {
         contentContainerStyle={styles.listContent}
         columnWrapperStyle={styles.gridRow}
         numColumns={2}
-        renderItem={({ item }) => <AnimeCard item={item} isFavorite={favoriteIds.has(item.aid)} />}
+        renderItem={renderItem}
+        initialNumToRender={8}
+        maxToRenderPerBatch={10}
+        windowSize={9}
         ListEmptyComponent={
           searching ? null : (
             <ThemedView style={styles.empty}>
@@ -495,11 +505,22 @@ function yearOf(item: AnimeDetail): string | null {
   return null;
 }
 
-function AnimeCard({ item, isFavorite }: { item: AnimeDetail; isFavorite: boolean }) {
+const AnimeCard = memo(function AnimeCard({
+  item,
+  isFavorite,
+}: {
+  item: AnimeDetail;
+  isFavorite: boolean;
+}) {
   const year = yearOf(item);
   return (
     <Pressable
-      onPress={() => router.push({ pathname: '/anime/[aid]', params: { aid: String(item.aid) } })}
+      onPress={() =>
+        router.push({
+          pathname: '/anime/[aid]',
+          params: { aid: String(item.aid), item: JSON.stringify(item) },
+        })
+      }
       style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}>
       <View style={styles.posterWrap}>
         {item.pictureUrl ? (
@@ -541,7 +562,7 @@ function AnimeCard({ item, isFavorite }: { item: AnimeDetail; isFavorite: boolea
       </View>
     </Pressable>
   );
-}
+});
 
 function SkeletonBrowse({ label }: { label: string }) {
   return (

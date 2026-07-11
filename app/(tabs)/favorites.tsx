@@ -6,8 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { CATEGORIES, getCachedCategory } from '@/src/services/anilist';
-import { loadFavorites } from '@/src/services/favorites';
+import { loadFavoriteItems } from '@/src/services/favorites';
 import { AnimeDetail } from '@/src/types/anime';
 
 export default function FavoritesScreen() {
@@ -18,28 +17,11 @@ export default function FavoritesScreen() {
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
-      (async () => {
-        const [favSet, ...caches] = await Promise.all([
-          loadFavorites(),
-          ...CATEGORIES.map((c) => getCachedCategory(c.id)),
-        ]);
+      loadFavoriteItems().then((list) => {
         if (cancelled) return;
-        const byAid = new Map<number, AnimeDetail>();
-        for (const cache of caches) {
-          if (!cache) continue;
-          for (const a of cache) {
-            if (!byAid.has(a.aid)) byAid.set(a.aid, a);
-          }
-        }
-        const list: AnimeDetail[] = [];
-        for (const aid of favSet) {
-          const a = byAid.get(aid);
-          if (a) list.push(a);
-        }
-        list.sort((a, b) => a.title.localeCompare(b.title));
         setItems(list);
         setLoaded(true);
-      })();
+      });
       return () => {
         cancelled = true;
       };
@@ -78,7 +60,12 @@ export default function FavoritesScreen() {
 function FavoriteRow({ item }: { item: AnimeDetail }) {
   return (
     <Pressable
-      onPress={() => router.push({ pathname: '/anime/[aid]', params: { aid: String(item.aid) } })}
+      onPress={() =>
+        router.push({
+          pathname: '/anime/[aid]',
+          params: { aid: String(item.aid), item: JSON.stringify(item) },
+        })
+      }
       style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}>
       {item.pictureUrl && (
         <Image source={{ uri: item.pictureUrl }} style={styles.poster} contentFit="cover" />

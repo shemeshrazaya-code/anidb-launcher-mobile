@@ -38,6 +38,10 @@ const BROWSE_QUERY = `query (
   }
 }`;
 
+const DETAIL_QUERY = `query ($id: Int) {
+  Media(id: $id, type: ANIME) { ${MEDIA_FIELDS} }
+}`;
+
 const SEARCH_QUERY = `query ($search: String, $page: Int, $perPage: Int, $isAdult: Boolean) {
   Page(page: $page, perPage: $perPage) {
     pageInfo { hasNextPage currentPage total }
@@ -282,7 +286,13 @@ async function rateLimit(): Promise<void> {
   lastCallAt = Date.now();
 }
 
-async function postGraphql<T>(query: string, variables: Record<string, unknown>): Promise<T> {
+const MAX_RATE_LIMIT_RETRIES = 5;
+
+async function postGraphql<T>(
+  query: string,
+  variables: Record<string, unknown>,
+  attempt = 0,
+): Promise<T> {
   await rateLimit();
   const res = await fetch(API_URL, {
     method: 'POST',
@@ -294,9 +304,15 @@ async function postGraphql<T>(query: string, variables: Record<string, unknown>)
     body: JSON.stringify({ query, variables }),
   });
   if (res.status === 429) {
-    const retryAfter = parseInt(res.headers.get('Retry-After') ?? '30', 10);
-    await new Promise((r) => setTimeout(r, Math.min(Math.max(retryAfter, 1), 90) * 1000));
-    return postGraphql<T>(query, variables);
+    if (attempt >= MAX_RATE_LIMIT_RETRIES) {
+      throw new AniListError('AniList rate limit persisted after retries');
+    }
+    // Retry-After may be an HTTP-date instead of seconds; NaN would make
+    // setTimeout fire immediately and hammer the API.
+    const parsed = parseInt(res.headers.get('Retry-After') ?? '', 10);
+    const retryAfter = Number.isFinite(parsed) ? Math.min(Math.max(parsed, 1), 90) : 30;
+    await new Promise((r) => setTimeout(r, retryAfter * 1000));
+    return postGraphql<T>(query, variables, attempt + 1);
   }
   if (!res.ok) {
     throw new AniListError(`AniList HTTP ${res.status}`);
@@ -385,6 +401,12 @@ export async function getCachedAnyCategory(aid: number): Promise<AnimeDetail | n
     if (found) return found;
   }
   return null;
+}
+
+/** Fetch a single title from AniList by id — fallback for items not in any cache. */
+export async function getAnimeById(aid: number): Promise<AnimeDetail | null> {
+  const data = await postGraphql<{ Media: AniListMedia | null }>(DETAIL_QUERY, { id: aid });
+  return data.Media ? mediaToDetail(data.Media) : null;
 }
 
 export async function searchAnime(
